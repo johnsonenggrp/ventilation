@@ -5284,14 +5284,17 @@ const TEAM = (function () {
 
   /* ---------------- Dropbox client ---------------- */
   // Same surface as createClient() (me / list / item / get / put / remove / putPhoto / getPhoto) over the Dropbox API v2; the file's `rev` plays the eTag.
-  // The team folder is addressed as "ns:<root namespace id>/<folder>/…" so a Dropbox Business team-space folder works without custom headers.
+  // The team folder is reached the way Dropbox documents for a Business team space: every files/* request carries the header
+  // Dropbox-API-Path-Root: {".tag":"root","root":"<root namespace id>"} and an ordinary path ("/<folder>/…"). (An "ns:<root>/<folder>" path does NOT cross into a
+  // team folder — the real Dropbox answered "not found" for JEG's — and a plain path without the header is the member's own home space.)
   // Dropbox hides folders you can't see (reports them as not found), so the base folder is checked before any upload and a missing one is reported as
   // "not shared with you" — the app never creates the base folder itself.
   function createDropboxClient(o) {
     const f = o.fetch || ((...a) => fetch(...a));
     const api = (o.apiBase || 'https://api.dropboxapi.com').replace(/\/+$/, ''), cdn = (o.contentBase || 'https://content.dropboxapi.com').replace(/\/+$/, '');
     const folderName = String(o.folder || 'Ventilation Sizing').replace(/^\/+|\/+$/g, '');
-    const base = (o.rootNamespaceId ? 'ns:' + o.rootNamespaceId : '') + '/' + folderName, P = sub => base + '/' + sub;
+    const base = '/' + folderName, P = sub => base + '/' + sub;
+    const pathRoot = o.rootNamespaceId ? JSON.stringify({ '.tag': 'root', root: String(o.rootNamespaceId) }) : '';
     const sleep = ms => new Promise(r => setTimeout(r, ms));
     const hdrJson = x => JSON.stringify(x).replace(/[\u007f-￿]/g, c => '\\u' + ('0000' + c.charCodeAt(0).toString(16)).slice(-4));   // header-safe JSON
     const names = {}; let verifiedAt = 0;   // the base folder is re-checked every ten minutes
@@ -5300,6 +5303,7 @@ const TEAM = (function () {
     function dbxError(status, sum, what) {
       const t = (code, msg) => { const e = new TeamError(code, msg, status); e.summary = sum; return e; };
       if (status === 401) return t('auth', 'Sign in again to reach the team folder.');
+      if (status === 422 && /invalid_root/.test(sum)) return t('server', 'Dropbox didn’t accept the team space for this account (invalid root) — tell the person who set up the app.');
       if (status === 403 || /no_write_permission|no_permission|team_access|restricted_content|access_denied/.test(sum)) return t('denied', o.deniedText || 'Dropbox says you don’t have access to the team folder — ask the admin to share it with you.');
       if (status === 409 && /not_found/.test(sum)) return t('missing', (what || 'That') + ' isn’t in the team folder.');
       if (status === 409 && /conflict/.test(sum)) return t('conflict', 'Someone else changed this site since you last synced.');
@@ -5310,6 +5314,7 @@ const TEAM = (function () {
       for (;;) {
         let tok; try { tok = await o.getToken(); } catch (e) { throw new TeamError('auth', 'Sign in again to reach the team folder.'); }
         const headers = { Authorization: 'Bearer ' + tok }, opt = { method: 'POST', headers }; let url;
+        if (pathRoot && /^files\//.test(endpoint)) headers['Dropbox-API-Path-Root'] = pathRoot;
         if (kind === 'rpc') { url = api + '/2/' + endpoint; if (arg !== undefined) { headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(arg); } }
         else { url = cdn + '/2/' + endpoint; headers['Dropbox-API-Arg'] = hdrJson(arg); if (kind === 'up') { headers['Content-Type'] = 'application/octet-stream'; opt.body = body; } }
         let res; try { res = await f(url, opt); } catch (e) { throw new TeamError('offline', 'Can’t reach Dropbox — check the connection.'); }
