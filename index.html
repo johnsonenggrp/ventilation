@@ -543,7 +543,9 @@ table.pcond td.lcol{white-space:normal}
 .draft.is-past{background:#e3e8ec;color:#5b6b75}
 
 /* dashboard table: row actions */
-.dt-act{white-space:nowrap;text-align:right}
+.dt-act{white-space:nowrap;text-align:right;width:1%}
+.dt-acts{display:inline-grid;grid-template-columns:repeat(2,minmax(92px,auto));gap:2px 6px;justify-items:stretch}
+.dt-acts .btn-icon{text-align:center}
 .dt-act .btn-icon{color:var(--muted);font-weight:600}
 .dt-act .btn-icon.open{color:var(--accent-700);font-weight:700}
 .dt-act .btn-icon:hover{color:var(--ink)}
@@ -5921,7 +5923,7 @@ const SHELL = (function () {
           btns.push(bState, bDup);
         }
         const bDel = el('button', 'btn-icon danger', 'Delete'); bDel.addEventListener('click', () => deleteSite(s)); btns.push(bDel);
-        btns.forEach(b => act.appendChild(b));
+        const grid = el('div', 'dt-acts'); btns.forEach(b => grid.appendChild(b)); act.appendChild(grid);   // two buttons per line, so the Team column doesn't push the table sideways
         tr.addEventListener('click', e2 => { if (!e2.target.closest('button')) open(s); });
         tb.appendChild(tr);
       });
