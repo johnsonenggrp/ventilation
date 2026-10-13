@@ -1,0 +1,14 @@
+{
+  "name": "JEG Ventilation Sizing",
+  "short_name": "Vent Sizing",
+  "description": "Johnson Engineering ventilation sizing - existing sites and proposed designs, all in one dashboard.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f4f6f8",
+  "theme_color": "#426170",
+  "icons": [
+    { "src": "Sizing_icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
