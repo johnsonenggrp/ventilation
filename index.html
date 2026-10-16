@@ -543,13 +543,24 @@ table.pcond td.lcol{white-space:normal}
 .draft.is-past{background:#e3e8ec;color:#5b6b75}
 
 /* dashboard table: row actions */
-.dt-act{white-space:nowrap;text-align:right;width:1%}
-.dt-acts{display:inline-grid;grid-template-columns:repeat(2,minmax(92px,auto));gap:2px 6px;justify-items:stretch}
-.dt-acts .btn-icon{text-align:center}
-.dt-act .btn-icon{color:var(--muted);font-weight:600}
-.dt-act .btn-icon.open{color:var(--accent-700);font-weight:700}
-.dt-act .btn-icon:hover{color:var(--ink)}
-.dt-act .btn-icon.danger:hover{color:var(--bad)}
+.dash-table th,.dash-table td{border-left:1px solid var(--line);padding-left:9px;padding-right:9px}   /* column separators (tighter side padding so the boxed buttons still fit) */
+.dash-table th:first-child,.dash-table td:first-child{border-left:0}
+.dt-act{white-space:nowrap;text-align:center;width:1%}
+.dt-acts{display:inline-grid;grid-template-columns:repeat(2,100px);gap:6px;justify-items:stretch}
+/* boxed buttons: neutral = white with a hairline, Open = soft blue, Upload / Get latest / Resolve = solid blue, Delete = red text */
+.dt-acts .btn-icon{text-align:center;color:var(--ink);font-weight:600;background:#fff;border:1px solid #c6d2d9;border-radius:7px;padding:5px 6px;font-size:11.5px;white-space:nowrap;box-shadow:0 1px 1px rgba(66,97,112,.08)}
+.dt-acts .btn-icon:hover{background:var(--brand-50);border-color:#a9b9c2;color:var(--ink)}
+.dt-acts .btn-icon.open{color:var(--accent-700);background:var(--accent-50);border-color:var(--accent);font-weight:700}
+.dt-acts .btn-icon.open:hover{background:#d6eefa;color:var(--accent-700)}
+.dt-acts .btn-icon.sync-act{color:#fff;background:var(--accent-700);border-color:var(--accent-700);font-weight:700}
+.dt-acts .btn-icon.sync-act:hover{background:#17709c;border-color:#17709c;color:#fff}
+.dt-acts .btn-icon.danger{color:var(--bad);border-color:#e9c4bf}
+.dt-acts .btn-icon.danger:hover{background:var(--bad-bg);border-color:var(--bad);color:var(--bad)}
+/* the name cell is a real table cell (shell.css makes it a flex box, which drops vertical-align and pins the name to the top of a tall row) */
+.dash-table td.dt-name{display:table-cell}
+.dash-table td.dt-name .sdot{margin-right:8px;vertical-align:middle}
+.dash-table td.dt-name b,.dash-table td.dt-name .draft{vertical-align:middle}
+.dash-table td.dt-name .draft{margin-left:8px}
 .dash-table tr.is-past .dt-name b{color:#5b6b75}
 .dash-table tr.is-past{opacity:.86}
 
@@ -598,6 +609,11 @@ table.pcond td.lcol{white-space:normal}
 .tb-btn{padding:6px 12px;font-size:12.5px}
 .tb-btn:disabled{opacity:.55;cursor:default}
 
+/* "a site with this name already exists" note under the name field on the setup page */
+.su-dup{margin:-2px 0 12px;padding:9px 12px;border:1px solid #e0b36a;background:#fbf3e3;border-radius:8px;font-size:12.5px;line-height:1.45;color:#6f520f}
+.su-dup[hidden]{display:none}
+.su-dup button{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--accent-700);text-decoration:underline;cursor:pointer}
+
 /* where a site stands against the team library */
 .dt-team{white-space:nowrap}
 .sync{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.02em;border-radius:999px;padding:2px 10px;border:1px solid;white-space:nowrap}
@@ -607,8 +623,7 @@ table.pcond td.lcol{white-space:normal}
 .sync-team{color:var(--accent-700);background:#e8f6fd;border-color:var(--accent)}
 .sync-ahead,.sync-behind,.sync-removed{color:var(--warn);background:#fbf3e3;border-color:#e0b36a}
 .sync-conflict{color:var(--bad);background:var(--bad-bg);border-color:var(--bad)}
-.dt-act .sync-act{color:var(--accent-700);font-weight:700}
-.dt-act .sync-act:disabled{opacity:.55;cursor:default}
+.dt-acts .sync-act:disabled{opacity:.55;cursor:default}
 
 /* inside a site */
 .sync-line{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
@@ -5172,7 +5187,17 @@ const VENT = (function () {
   }
 
   const photos = { refs: photoRefs, get: (ref, cb) => resolvePhoto(ref, cb), put: (ref, dataUrl) => isPhotoRef(ref) ? PhotoStore.put(ref.slice(4), dataUrl) : Promise.resolve(ref) };
-  return { mount, computeSection, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, photos };
+  // Is there already a site with this name and kind? Used to warn before a second copy is created or uploaded.
+  // `site` = { id, name, type }; `candidates` = [{ id, name, type, where: 'team' | 'device', … }]. Same name = ignoring case and extra spaces. A blank name or
+  // "Untitled" never matches, the site itself never matches, and an Existing and a Proposed site may share a name (the survey and the design of the same farm).
+  function findDuplicateSite(site, candidates) {
+    const norm = n => String(n == null ? '' : n).toLowerCase().replace(/\s+/g, ' ').trim(), kind = t => (t === 'proposed' ? 'proposed' : 'existing');
+    const key = norm(site && site.name); if (!key || key === 'untitled') return null;
+    const hits = (candidates || []).filter(c => c && c.id !== site.id && norm(c.name) === key && kind(c.type) === kind(site.type));
+    return hits.find(c => c.where === 'team') || hits[0] || null;   // the team's copy matters most
+  }
+
+  return { mount, computeSection, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, photos, findDuplicateSite };
 })();
 
 const TEAM_CONFIG = {
@@ -5705,6 +5730,15 @@ const SHELL = (function () {
   const idbId = ref => ref.slice(4);
   const getLocalPhoto = ref => new Promise(res => VENT.photos.get(ref, d => res(d || null)));
 
+  // duplicate-name warning: the sites already on the team (team mode) and on this device, as candidates for VENT.findDuplicateSite
+  const dupCandidates = () => (teamOn() ? teamRows.map(e => ({ id: e.id, name: e.name, type: e.type, where: 'team', by: e.modifiedBy ? personOf(e.modifiedBy) : '', at: e.modifiedAt, entry: e })) : [])
+    .concat(store.sites.filter(x => !x.setup).map(x => ({ id: x.id, name: x.name, type: siteType(x), where: 'device' })));
+  const findDup = (site, name, type) => VENT.findDuplicateSite({ id: site.id, name: name != null ? name : site.name, type: type || siteType(site) }, dupCandidates());
+  const dupText = (d, name) => 'There is already ' + (d.type === 'proposed' ? 'a proposed' : 'an existing') + ' site named “' + (d.name || name || 'Untitled') + '” ' +
+    (d.where === 'team' ? 'on the team' + (d.by || d.at ? ' (uploaded by ' + (d.by || 'someone') + (d.at ? ', ' + when(d.at) : '') + ')' : '') : 'on this device') + '.';
+  // open the existing site; a team site that isn't on this device yet is fetched first (one that is already here is opened as it is — never overwritten)
+  const openDup = d => { if (d.where === 'team' && !store.sites.some(x => x.id === d.id)) open(pseudo(d.entry)); else { store.activeId = d.id; save(); route(); } };
+
   async function refreshTeam() {
     if (!teamOn() || teamBusy) return;
     teamBusy = true; teamErr = null;
@@ -5774,8 +5808,14 @@ const SHELL = (function () {
     save(); return local;
   }
   // upload with the friendly handling of the ways it can go wrong; done() runs afterwards either way
-  async function syncUp(s, done) {
+  async function syncUp(s, done, skipDupCheck) {
     const fin = () => { if (done) done(); };
+    if (!s.remote && !skipDupCheck) {   // first upload of this site: is the same site already on the team? (a site recorded with no signal is only caught here)
+      if (!teamLoaded || Date.now() - teamStamp > 30000) await refreshTeam();
+      const d = findDup(s);
+      if (d && d.where === 'team') return modal('This site may already be on the team', [dupText(d, s.name), 'If it is the same site, open the team’s copy so there is only one — your copy stays on this device. If it is a different site, give it a different name first, or upload it anyway.'], [
+        { label: 'Open the team’s copy', kind: 'primary', run: () => openDup(d) }, { label: 'Upload anyway', run: () => syncUp(s, done, true) }, { label: 'Cancel', run: fin }]);
+    }
     try { await uploadSite(s); toast('Uploaded “' + (s.name || 'Untitled') + '” — the team can see it now.'); fin(); }
     catch (e) {
       if (e.code === 'conflict') return conflictDialog(s, done);
@@ -5965,7 +6005,7 @@ const SHELL = (function () {
     card.appendChild(el('p', 'setup-sub', 'Pick the kind of site, add a few details, and set the barns you’ll be working on. You can add or remove barns any time.'));
 
     // Existing vs Proposed
-    let type = siteType(site);
+    let type = siteType(site), paintDup = () => {};
     card.appendChild(el('p', 'su-q', 'What kind of site is this?'));
     const typeRow = el('div', 'su-types'); typeRow.setAttribute('role', 'radiogroup');
     const TYPES = [
@@ -5976,7 +6016,7 @@ const SHELL = (function () {
       const b = el('button', 'su-type'); b.type = 'button'; b.setAttribute('role', 'radio');
       b.innerHTML = '<span class="st-t"></span><span class="st-d"></span>';
       b.querySelector('.st-t').textContent = t; b.querySelector('.st-d').textContent = d;
-      b.addEventListener('click', () => { type = k; paintTypes(); });
+      b.addEventListener('click', () => { type = k; paintTypes(); paintDup(); });
       typeRow.appendChild(b); return b;
     });
     const paintTypes = () => typeBtns.forEach((b, i) => { const on = TYPES[i][0] === type; b.classList.toggle('active', on); b.setAttribute('aria-checked', on ? 'true' : 'false'); });
@@ -5986,6 +6026,15 @@ const SHELL = (function () {
     const fields = el('div', 'setup-fields');
     const mk = (label, val, hint) => { const w = el('label', 'su-field'); w.appendChild(el('span', 'su-l', label)); const i = el('input', 'su-in'); i.value = val || ''; if (hint) i.placeholder = hint; w.appendChild(i); fields.appendChild(w); return i; };
     const inName = mk('Site name / number', site.name, 'e.g. C26');
+    // warn as soon as the name matches a site that already exists (on the team or on this device)
+    const dupNote = el('div', 'su-dup'); dupNote.hidden = true; fields.appendChild(dupNote);
+    const goOpen = d => { if (site.setup && !site.config) store.sites = store.sites.filter(x => x.id !== site.id); save(); openDup(d); };
+    paintDup = () => {
+      const d = findDup(site, inName.value, type); dupNote.hidden = !d; dupNote.textContent = ''; if (!d) return;
+      dupNote.appendChild(document.createTextNode(dupText(d, inName.value.trim()) + ' If it’s the same site, open it instead of starting a second one. '));
+      const o = el('button', '', 'Open it'); o.type = 'button'; o.addEventListener('click', () => goOpen(d)); dupNote.appendChild(o);
+    };
+    inName.addEventListener('input', paintDup);
     const inClient = mk('Client / producer', site.client, 'Owner or producer');
     const inJob = mk('Job No.', site.jobNo, 'e.g. 0084');
     const inDate = mk('Date', site.date || longToday());
@@ -6018,13 +6067,18 @@ const SHELL = (function () {
     const actions = el('div', 'setup-actions');
     const cancelBtn = el('button', 'btn-ghost', 'Cancel'); cancelBtn.addEventListener('click', cancel);
     const start = el('button', 'btn-primary', 'Start site →');
-    start.addEventListener('click', () => {
+    const doStart = () => {
       site.type = type; site.status = site.status || 'current';
       site.name = inName.value.trim() || 'Untitled';
       site.client = inClient.value.trim(); site.jobNo = inJob.value.trim();
       site.date = inDate.value.trim() || longToday(); site.preparedBy = inBy.value.trim();
       site.config = VENT.blankSnapshot(counts); site.setup = false; site.updatedAt = Date.now();
       save(); route();
+    };
+    start.addEventListener('click', () => {
+      const d = findDup(site, inName.value, type); if (!d) return doStart();
+      modal('A site with this name already exists', [dupText(d, inName.value.trim()), 'If it’s the same site, open it instead of starting a second one. If this is a different site, give it a different name, or start it anyway.'], [
+        { label: 'Open the existing site', kind: 'primary', run: () => goOpen(d) }, { label: 'Start a new site anyway', run: doStart }, { label: 'Back' }]);
     });
     actions.appendChild(cancelBtn); actions.appendChild(start);
     card.appendChild(actions);
@@ -6044,7 +6098,7 @@ const SHELL = (function () {
     const proposedSite = siteType(site) === 'proposed';
 
     const nameInput = el('input', 'proj-name-input'); nameInput.value = site.name; nameInput.title = 'Site name';
-    nameInput.addEventListener('change', () => { site.name = nameInput.value.trim() || site.name; site.updatedAt = Date.now(); save(); paintSync(); });
+    nameInput.addEventListener('change', () => { site.name = nameInput.value.trim() || site.name; site.updatedAt = Date.now(); save(); paintSync(); const d = findDup(site); if (d) toast(dupText(d, site.name) + ' Two sites with the same name are easy to mix up.'); });
     const printArea = el('div'); printArea.id = 'printArea';
     const meta = () => ({ project: site.name, client: site.client, jobNo: site.jobNo, date: site.date, preparedBy: site.preparedBy, byLabel: 'Prepared by', siteType: siteType(site), perBarnFactor: true });
     const bReport = el('button', 'btn btn-report', '🖨 Report / PDF'); bReport.title = 'Preview / save the report as a PDF'; bReport.addEventListener('click', () => { if (ventApi) ventApi.buildReport(printArea, meta(), () => window.print()); });
