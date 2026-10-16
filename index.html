@@ -4845,11 +4845,13 @@ const VENT = (function () {
     const snapshot = () => ({ v: 2, fanReductionPct: STATE.fanReductionPct, headLoss: STATE.headLoss, filterOversizingPct: STATE.filterOversizingPct, types: STATE.types, activeType: STATE.activeType, idx: STATE.idx, instances: STATE.instances });
     function loadSnap(o) { if (!o || !o.instances) return false; STATE.fanReductionPct = o.fanReductionPct != null ? o.fanReductionPct : STATE.fanReductionPct; STATE.headLoss = o.headLoss != null ? o.headLoss : STATE.headLoss; STATE.filterOversizingPct = o.filterOversizingPct != null ? o.filterOversizingPct : D.farmWide.filterOversizingPct; STATE.types = o.types || STATE.types; STATE.instances = o.instances; STATE.activeType = o.activeType || STATE.types[0]; STATE.idx = o.idx || {}; STATE.types.forEach(t => { if (STATE.idx[t] == null) STATE.idx[t] = 0; }); return true; }
     function persist() {
-      if (onChange) { try { onChange(snapshot()); } catch (e) {} return; }
+      if (onChange) { try { onChange(clone(snapshot())); } catch (e) {} return; }   // a copy: the receiver keeps it and compares it with the next one, so it must not change when the editor does
       if (!manage) return;
       try { localStorage.setItem(LSKEY, JSON.stringify(snapshot())); } catch (e) {}
     }
-    if (opts.initialConfig) { loadSnap(opts.initialConfig); }
+    // The editor works on its OWN COPY of the config it is given. loadSnap keeps the objects it is handed, so passing the caller's config straight in made the editor's live
+    // state and the caller's copy the same objects: every edit also changed the caller's "before" copy, which left the shell unable to tell that anything had changed.
+    if (opts.initialConfig) { loadSnap(clone(opts.initialConfig)); }
     else if (manage && !onChange) { try { localStorage.removeItem('cf_vent_config_v2'); const s = localStorage.getItem(LSKEY); if (s) loadSnap(JSON.parse(s)); } catch (e) {} }
 
     let OUT = {}, RES = {}, dirty = null;
@@ -5182,7 +5184,7 @@ const VENT = (function () {
     return {
       state: STATE, recalc: render, exportConfig, importConfig, resetConfig, buildReport,
       snapshot: () => snapshot(),
-      loadConfig: (snap) => { if (loadSnap(snap)) { fwReflect(); renderTypeTabs(); renderInstanceBar(); buildBarn(); } }
+      loadConfig: (snap) => { if (loadSnap(snap && clone(snap))) { fwReflect(); renderTypeTabs(); renderInstanceBar(); buildBarn(); } }
     };
   }
 
@@ -6157,6 +6159,7 @@ const SHELL = (function () {
     root.appendChild(intro);
 
     const host = el('div'); root.appendChild(host);
+    let opened = false;   // the calculator reports its state once as it opens; that report is the starting point, not an edit
     ventApi = VENT.mount(host, {
       layout: 'hybrid', manage: true, embedded: true, initialConfig: site.config, startEmpty: !site.config,
       scenarios: proposedSite ? ['proposed', 'existing'] : ['existing', 'proposed'],   // lead with the side you're working on
@@ -6164,8 +6167,10 @@ const SHELL = (function () {
       labels: { proposed: proposedSite ? 'Proposed Design' : 'Proposed Remodel' },
       onChange: snap => {
         // the calculator reports its state when it opens as well as when something changes — only a real change counts as an edit (otherwise just
-        // opening a site would mark it "changes not uploaded" and bump its date)
-        const same = !!site.config && JSON.stringify(snap) === JSON.stringify(site.config);
+        // opening a site would mark it "changes not uploaded" and bump its date). The opening report is not compared: the calculator fills in defaults and blank
+        // rows as it opens, so it never equals what was stored. Every later report is a copy of the editor's state and is compared with the one before it.
+        const first = !opened; opened = true;
+        const same = !!site.config && (first || JSON.stringify(snap) === JSON.stringify(site.config));
         site.config = snap; if (!same) { site.updatedAt = Date.now(); save(); }
         updateProg(); paintSync();
       }
