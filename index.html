@@ -676,6 +676,127 @@ table.pcond td.lcol{white-space:normal}
 
 <script>
 /* =====================================================================
+   Library-free .xlsx writer.
+   The same approach as exportXlsx in Truss_Evaluation_Form.html: a stored (uncompressed) zip built by hand (crc32 + zipStore) around hand-written SpreadsheetML parts,
+   no library. Extended here with real NUMBER cells and number formats (the Truss form only writes text).
+   Loaded before core.js (build-personal.ps1, tests/run.js and tests/build-page.js). Plain JS, no DOM, so the tests can run it in Node.
+
+   XLSXW.build(sheets) -> Uint8Array (the .xlsx file)
+     sheets: [{ name, cols: [width, ...], rows: [ [cell, ...] | null, ... ] }]
+     cell:   null / '' (empty) | string | number | { v: string | number | null, s: style }
+             a number is written as a number (<v>), a string as an inline string; a non-finite number is written empty.
+     style:  one of XLSXW.S (see below); a plain string or number gets S.TEXT / S.GEN.
+   ===================================================================== */
+const XLSXW = (function () {
+  const CRC_TABLE = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1); t[n] = c >>> 0; } return t; })();
+  function crc32(b) { let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_TABLE[(c ^ b[i]) & 0xFF] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function zipStore(files) {
+    const enc = new TextEncoder();
+    const u16 = n => [n & 0xFF, (n >>> 8) & 0xFF];
+    const u32 = n => [n & 0xFF, (n >>> 8) & 0xFF, (n >>> 16) & 0xFF, (n >>> 24) & 0xFF];
+    const parts = [], central = []; let offset = 0;
+    for (const f of files) {
+      const name = enc.encode(f.name), data = f.data, crc = crc32(data);
+      const lh = new Uint8Array([].concat(u32(0x04034b50), u16(20), u16(0), u16(0), u16(0), u16(0),
+        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0)));
+      parts.push(lh, name, data);
+      central.push({ rec: new Uint8Array([].concat(u32(0x02014b50), u16(20), u16(20), u16(0), u16(0), u16(0), u16(0),
+        u32(crc), u32(data.length), u32(data.length), u16(name.length), u16(0), u16(0), u16(0), u16(0), u32(0), u32(offset))), name });
+      offset += lh.length + name.length + data.length;
+    }
+    const cdStart = offset; let cdSize = 0;
+    for (const c of central) { parts.push(c.rec, c.name); cdSize += c.rec.length + c.name.length; }
+    parts.push(new Uint8Array([].concat(u32(0x06054b50), u16(0), u16(0), u16(central.length), u16(central.length),
+      u32(cdSize), u32(cdStart), u16(0))));
+    let total = 0; for (const p of parts) total += p.length;
+    const out = new Uint8Array(total); let pos = 0;
+    for (const p of parts) { out.set(p, pos); pos += p.length; }
+    return out;
+  }
+  const xesc = s => String(s).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const enc = new TextEncoder();
+  const part = (name, str) => ({ name, data: enc.encode(str) });
+  // Excel sheet-name rules: <=31 chars, no \ / ? * [ ] :, unique (case-insensitive)
+  function uniqueSheetNames(names) {
+    const used = new Set(), out = [];
+    names.forEach(raw => {
+      let n = (raw || 'Sheet').replace(/[\\\/\?\*\[\]:]/g, '-').replace(/^'+|'+$/g, '').slice(0, 31).trim() || 'Sheet';
+      const base = n; let i = 1;
+      while (used.has(n.toLowerCase())) { const suf = ' (' + (++i) + ')'; n = base.slice(0, 31 - suf.length) + suf; }
+      used.add(n.toLowerCase()); out.push(n);
+    });
+    return out;
+  }
+
+  // style ids = positions in <cellXfs> below
+  const S = { DEFAULT: 0, TITLE: 1, HEAD: 2, TEXT: 3, BOLD: 4, INT: 5, DEC1: 6, DEC2: 7, DEC3: 8, GEN: 9, BAD: 10, OK: 11, NA: 12, SECTION: 13, NOTE: 14 };
+  const bordered = (numFmt, extra) => '<xf numFmtId="' + numFmt + '" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"' + (extra || '') + '/></xf>';
+  const filled = fill => '<xf numFmtId="0" fontId="0" fillId="' + fill + '" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>';
+  const STYLES_XML =
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n' +
+'<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+'<numFmts count="2"><numFmt numFmtId="164" formatCode="#,##0.0"/><numFmt numFmtId="165" formatCode="0.000"/></numFmts>' +
+'<fonts count="5"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="14"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="12"/><name val="Calibri"/></font><font><i/><sz val="10"/><color rgb="FF595959"/><name val="Calibri"/></font></fonts>' +
+'<fills count="6"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD9E1F2"/><bgColor indexed="64"/></patternFill></fill>' +
+'<fill><patternFill patternType="solid"><fgColor rgb="FFF8D7DA"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFD4EDDA"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFEDEDED"/><bgColor indexed="64"/></patternFill></fill></fills>' +
+'<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left style="thin"><color indexed="64"/></left><right style="thin"><color indexed="64"/></right><top style="thin"><color indexed="64"/></top><bottom style="thin"><color indexed="64"/></bottom><diagonal/></border></borders>' +
+'<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+'<cellXfs count="15">' +
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +                                                                                                                                                      // 0 DEFAULT
+'<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +                                                                                                                         // 1 TITLE
+'<xf numFmtId="0" fontId="2" fillId="2" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment horizontal="left" vertical="center" wrapText="1"/></xf>' +                    // 2 HEAD
+'<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>' +                                                              // 3 TEXT
+'<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +                                                                                                                         // 4 BOLD
+bordered(3) + bordered(164) + bordered(2) + bordered(165) + bordered(0) +                                                                                                                                   // 5 INT (#,##0)  6 DEC1  7 DEC2 (0.00)  8 DEC3 (0.000)  9 GEN
+filled(3) + filled(4) + filled(5) +                                                                                                                                                                          // 10 BAD  11 OK  12 NA
+'<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +                                                                                                                         // 13 SECTION
+'<xf numFmtId="0" fontId="4" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +                                                                                                                         // 14 NOTE
+'</cellXfs><cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+
+  const colName = i => { let s = ''; for (i += 1; i > 0; i = Math.floor((i - 1) / 26)) s = String.fromCharCode(65 + (i - 1) % 26) + s; return s; };   // 0 -> A, 26 -> AA
+  function cellXml(ref, c) {
+    let v = c, s = null;
+    if (c && typeof c === 'object') { v = c.v; s = c.s != null ? c.s : null; }
+    if (typeof v === 'number') {
+      if (!isFinite(v)) return s != null ? '<c r="' + ref + '" s="' + s + '"/>' : '';
+      return '<c r="' + ref + '" s="' + (s != null ? s : S.GEN) + '"><v>' + String(v) + '</v></c>';
+    }
+    if (v == null || v === '') return s != null ? '<c r="' + ref + '" s="' + s + '"/>' : '';
+    return '<c r="' + ref + '" s="' + (s != null ? s : S.TEXT) + '" t="inlineStr"><is><t xml:space="preserve">' + xesc(v) + '</t></is></c>';
+  }
+  function sheetXml(sh) {
+    const rowsXml = [];
+    (sh.rows || []).forEach((row, r) => {
+      if (!row) return;
+      const cells = row.map((c, i) => cellXml(colName(i) + (r + 1), c)).join('');
+      if (cells) rowsXml.push('<row r="' + (r + 1) + '">' + cells + '</row>');
+    });
+    const cols = (sh.cols || []).map((w, i) => '<col min="' + (i + 1) + '" max="' + (i + 1) + '" width="' + w + '" customWidth="1"/>').join('');
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' + (cols ? '<cols>' + cols + '</cols>' : '') + '<sheetData>' + rowsXml.join('') + '</sheetData></worksheet>';
+  }
+  function build(sheets) {
+    const names = uniqueSheetNames(sheets.map(s => s.name)), files = [];
+    sheets.forEach((sh, i) => files.push(part('xl/worksheets/sheet' + (i + 1) + '.xml', sheetXml(sh))));
+    files.push(part('xl/styles.xml', STYLES_XML));
+    files.push(part('xl/workbook.xml',
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><bookViews><workbookView/></bookViews><sheets>' +
+      sheets.map((sh, i) => '<sheet name="' + xesc(names[i]) + '" sheetId="' + (i + 1) + '" r:id="rId' + (i + 1) + '"/>').join('') + '</sheets></workbook>'));
+    files.push(part('xl/_rels/workbook.xml.rels',
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      sheets.map((sh, i) => '<Relationship Id="rId' + (i + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet' + (i + 1) + '.xml"/>').join('') +
+      '<Relationship Id="rId' + (sheets.length + 1) + '" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'));
+    files.push(part('[Content_Types].xml',
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      sheets.map((sh, i) => '<Override PartName="/xl/worksheets/sheet' + (i + 1) + '.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('') + '</Types>'));
+    files.push(part('_rels/.rels',
+'<?xml version="1.0" encoding="UTF-8" standalone="yes"?>\n<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'));
+    return zipStore(files);
+  }
+  return { build, S, crc32, zipStore, uniqueSheetNames, colName, xesc };
+})();
+
+/* =====================================================================
    Ventilation Calculator — shared core (multi-barn,
    multiple instances per barn type). The data placeholder on the VENT_DATA line
    below is replaced with the extracted workbook data by the build scripts to
@@ -4931,6 +5052,142 @@ const VENT = (function () {
     container.innerHTML = h;
   }
 
+  /* ---- Excel export ----
+     One workbook per site: a Summary sheet (every barn and scenario) and one sheet per barn (equipment rows, capacity-vs-requirement checks, design assumptions).
+     It reads the same results the report is built from (evalScenario / assess / rowNotes) and does no arithmetic of its own, so the two cannot disagree; tests/cases.js
+     diffs the workbook against the rendered report for the built-in sample barns.
+     A number the report PRINTS is exported as that number: rep(x, d) is fmt(x, d) read back as a number, so "151,596" in the report is 151596 in the cell (a real number,
+     with a display format). Numbers the report does not print (CFM per row, capacities, requirements) are exported at full precision with a display format.
+     XLSXW (app/_src/xlsx.js) writes the file. */
+  function exportModel(config, meta) {
+    meta = meta || {}; config = config || {};
+    const S = XLSXW.S, today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    const st = meta.siteType, designSite = st === 'proposed', date = meta.date || today, project = meta.project || '—';
+    const rep = (x, d) => { const s = fmt(x, d); return s === '—' ? null : +s.replace(/,/g, ''); };
+    const DEC = [S.INT, S.DEC1, S.DEC2, S.DEC3];
+    const R = (x, d) => ({ v: rep(x, d), s: DEC[d] }), raw = (x, style) => ({ v: (x == null || !isFinite(x)) ? null : x, s: style }), T = v => ({ v: v == null ? '' : String(v), s: S.TEXT });
+    const head = labels => labels.map(l => ({ v: l, s: S.HEAD }));
+    const exLang = ['Under-ventilated', 'Adequate as installed'], prLang = ['Needs attention', 'Meets targets'];
+    const verdictText = (a, lang) => a.incomplete ? 'Incomplete — no fans recorded' : a.issues.length ? lang[0] + ' — ' + a.issues.join(', ') : lang[1];
+    const verdictCell = (a, lang) => ({ v: verdictText(a, lang), s: a.incomplete ? S.NA : a.issues.length ? S.BAD : S.OK });
+    const modeText = p => (p.mode === 'calc' ? 'calculated' : 'entered') + (p.fallback ? '; no soffit / inlet path recorded, so the tunnel pressure is used' : '');
+    const chkText = c => (c.cap > 0 && c.ref > 0) ? (c.ok ? 'Sufficient' : 'Insufficient') : (c.cap > 0 ? '—' : 'none');
+    const CATS = [['fan', 'Fans'], ['inlet', 'Inlets'], ['inletFilter', 'Inlet Filters'], ['coolCell', 'Cool Cells'], ['filter', 'Filter Bank'], ['soffit', 'Soffit'], ['shutter', 'Shutter']];
+    const CHECKS = [['inlet', 'Inlet Area'], ['inletFilter', 'Inlet Filter Area'], ['coolCell', 'Cool Cell Area'], ['filter', 'Filter Bank Area'], ['soffit', 'Soffit Area'], ['shutter', 'Shutter Area']];
+    const qtyOf = v => (v === '' || v == null) ? null : num(v);
+    const types = config.types || D.meta.barns, barns = [];
+    types.forEach(type => ((config.instances || {})[type] || []).forEach(inst => {
+      const isFar = inst.type === 'far', rooms = num(inst.building.rooms) || 1, ex = evalScenario(config, type, inst, 'existing'), pr = evalScenario(config, type, inst, 'proposed');
+      barns.push({ type, inst, isFar, rooms, ex, pr, aEx: assess(ex), aPr: assess(pr), showEx: !(designSite && !(ex.totals.fanMax > 0)) });   // the report's rule: a design with nothing installed drops "As installed"
+    }));
+    const scen = b => (b.showEx ? [['As installed', b.ex, b.aEx, exLang, 'existing']] : []).concat([['Proposed', b.pr, b.aPr, prLang, 'proposed']]);
+    const barnLabel = b => b.type + ' — ' + b.inst.name + (b.isFar ? ' (per room)' : '');
+
+    // ---- Summary sheet ----
+    const sum = [];
+    sum.push([{ v: 'Ventilation Sizing — ' + (designSite ? 'design' : 'audit') + ' summary', s: S.TITLE }]);
+    const metaRows = [['Site', project], ['Client', meta.client || '—'], ['Job No.', meta.jobNo || '—'], ['Date', date], [meta.byLabel || 'Recorded by', meta.preparedBy || '—']];
+    if (st) metaRows.push(['Site type', designSite ? 'Proposed site (new design)' : 'Existing site']);
+    metaRows.forEach(([k, v]) => sum.push([{ v: k, s: S.BOLD }, { v: v, s: S.DEFAULT }]));
+    sum.push(null);
+    sum.push(head(['Barn', 'Scenario', 'Fan capacity (max), CFM', 'Fan capacity (min), CFM', 'Building total (max), CFM', 'CFM / pig (max)', 'CFM / pig (min)', 'Air exchange (max), sec', 'Air exchange (min), min', 'Air speed (max), ft/min',
+      'Calc. static pressure, in', 'Fan pressure used (tunnel), in', 'Tunnel pressure is', 'Fan pressure used (min), in', 'Min pressure is', 'Verdict']));
+    barns.forEach(b => scen(b).forEach(([label, res, a, lang]) => {
+      const t = res.totals;
+      sum.push([T(barnLabel(b)), T(label), R(t.fanMax, 0), R(t.fanMin, 0), b.isFar ? R(t.fanMax * b.rooms, 0) : { v: null, s: S.TEXT }, R(t.perHeadMax, 1), R(t.perHeadMin, 1), R(t.airExchSec, 1), R(t.airExchMin, 1), R(t.airSpeedMax, 0),
+        R(t.spCalc, 3), R(res.pressure.fan.used, 3), T(modeText(res.pressure.fan)), R(res.pressure.fanMin.used, 3), T(modeText(res.pressure.fanMin)), verdictCell(a, lang)]);
+    }));
+    if (!barns.length) sum.push([{ v: 'No barns recorded yet.', s: S.NOTE }]);
+    sum.push(null);
+    sum.push([{ v: 'Fan capacities are after the fan reduction. Farrowing is per room; "Building total" is rooms × the room capacity. Numbers match the report. Details for each barn are on its own sheet.', s: S.NOTE }]);
+    const sheets = [{ name: 'Summary', cols: [34, 14, 14, 14, 14, 11, 11, 13, 13, 13, 13, 14, 15, 14, 15, 60], rows: sum }];
+
+    // ---- one sheet per barn ----
+    barns.forEach(b => {
+      const { type, inst, isFar, rooms, ex, pr } = b, lim = D.barns[type].limits, rows = [], push = (...c) => rows.push(c), sections = scen(b);
+      push({ v: barnLabel(b), s: S.TITLE });
+      push({ v: 'Site', s: S.BOLD }, { v: project, s: S.DEFAULT }); push({ v: 'Date', s: S.BOLD }, { v: date, s: S.DEFAULT });
+      rows.push(null);
+      // building
+      push({ v: 'Building', s: S.SECTION });
+      push(...head(['Item', 'Value']));
+      [['Length, ft', R(num(inst.building.length), 1)], ['Width, ft', R(num(inst.building.width), 1)], ['Height, ft', R(num(inst.building.height), 1)], [isFar ? 'Head per room' : 'Inventory, head', R(num(inst.building.inventory), 0)]]
+        .concat(isFar ? [['Rooms', R(rooms, 0)]] : []).concat([['Cross vent', T(inst.building.crossVent || 'No')], ['Center tunnel', T(inst.building.centerTunnel || 'No')]])
+        .forEach(([k, v]) => push(T(k), v));
+      rows.push(null);
+      // verdict, worded as in the report
+      push({ v: 'Verdict', s: S.SECTION });
+      push(...head(['Scenario', 'Verdict']));
+      if (!st) push(T('As installed'), verdictCell(b.aEx, exLang));
+      else if (designSite) push(T('Proposed design'), verdictCell(b.aPr, prLang));
+      else { push(T('As installed'), verdictCell(b.aEx, exLang)); if (!b.aPr.incomplete) push(T('Proposed remodel'), verdictCell(b.aPr, prLang)); }
+      sections.forEach(([label, res, a]) => { if (!a.incomplete && a.missing && a.missing.length) push(T(label + ' — note'), { v: 'No capacity recorded for: ' + a.missing.join(', ') + ' — not counted against the verdict.', s: S.TEXT }); });
+      rows.push(null);
+
+      // equipment: both scenarios, one row per piece of equipment, in the report's category order
+      push({ v: 'Equipment', s: S.SECTION });
+      push(...head(['Scenario', 'Category', 'Make', 'Model', 'Size', 'Qty', 'Min qty', 'CFM each', 'Total CFM', 'Min-stage CFM', 'Row label']));
+      const noteLabel = (ck, rr) => rowNotes(ck, rr).map(n => n[1]).join('; ');
+      sections.forEach(([label, res, a, lang, sc]) => CATS.forEach(([ck, cname]) => (inst.rows[sc][ck] || []).forEach((r, i) => {
+        const rr = res.rows[ck][i]; if (!r || !rr) return;
+        let make = '', model = '', size = '', qty = qtyOf(r.qty), minQty = null, each = null, total = null, minTotal = null, tag = '';
+        if (ck === 'fan' && r.model) { make = r.mfg; model = [r.series, r.model].filter(Boolean).join(' '); minQty = qtyOf(r.minQty); each = rr.factored; total = rr.total; minTotal = rr.minCFM; tag = noteLabel('fan', rr); }
+        else if (ck === 'inlet' && r.model) { make = r.mfg; model = r.model; each = rr.cfm; total = rr.total; tag = noteLabel('inlet', rr); }
+        else if ((ck === 'inletFilter' || ck === 'filter') && r.type) { make = r.mfg; model = r.type; size = r.w && r.h ? r.w + ' × ' + r.h + ' in' : ''; each = rr.cfmEach; total = rr.total; tag = 'Workbook curve'; }
+        else if (ck === 'coolCell' && r.name) { make = r.mfg; model = r.name; size = r.lenFt && r.htFt ? r.lenFt + ' × ' + r.htFt + ' ft' : ''; qty = null; total = rr.cap; tag = 'Workbook curve'; }
+        else if (ck === 'soffit' && r.type) { model = r.type; size = [r.lenFt ? r.lenFt + ' ft' : '', r.widthIn ? r.widthIn + ' in wide' : ''].filter(Boolean).join(', '); qty = null; total = rr.total; tag = 'Velocity formula (4005 × √SP × opening coefficient)'; }
+        else if (ck === 'shutter' && (r.number || r.lenFt)) { size = [r.number ? r.number + ' ×' : '', r.lenFt ? r.lenFt + ' ft' : '', r.widthIn ? r.widthIn + ' in wide' : ''].filter(Boolean).join(' '); qty = null; total = rr.total; tag = 'Velocity formula (4005 × √SP × opening coefficient)'; }
+        else return;
+        push(T(label), T(cname), T(make), T(model), T(size), raw(qty, S.GEN), raw(minQty, S.GEN), raw(each, S.INT), raw(total, S.INT), raw(minTotal, S.INT), T(tag));
+      })));
+      push({ v: 'CFM each for fans is after the fan reduction (the published-table or workbook CFM × the fan factor), so Total CFM = CFM each × Qty. Fan Total CFM adds up to the fan capacity (max) in the Summary; Min-stage CFM adds up to the fan capacity (min).', s: S.NOTE });
+      rows.push(null);
+
+      // capacity vs requirement
+      push({ v: 'Capacity vs requirement', s: S.SECTION });
+      const FF = foOf(config, inst), ffText = ' × (1 + ' + fmt(FF, 1) + ' % filter oversizing)';
+      const basis = k => ({ inlet: 'barn min-vent fan flow', inletFilter: 'inlet capacity' + ffText,
+        coolCell: isFar ? 'whole-barn max-vent flow (rooms × room fans)' + ffText : 'max-vent fan flow' + ffText, filter: isFar ? 'whole-barn max-vent flow (rooms × room fans)' + ffText : 'max-vent fan flow' + ffText,
+        soffit: isFar ? 'whole-barn min-vent flow (rooms × room min fans)' : 'inlet capacity' + ffText, shutter: isFar ? 'inlet capacity' + ffText : 'max-vent fan flow' + ffText }[k]);
+      push(...head(['Check', 'Requirement is'].concat(sections.length === 2 ? ['As installed: capacity, CFM', 'Requirement, CFM', 'Status'] : []).concat(['Proposed: capacity, CFM', 'Requirement, CFM', 'Status'])));
+      CHECKS.forEach(([k, l]) => {
+        const row = [T(l), T(basis(k))];
+        sections.forEach(([label, res]) => { const c = res.checks[k]; row.push(raw(c.cap, S.INT), raw(c.ref, S.INT), T(chkText(c))); });
+        push(...row);
+      });
+      rows.push(null);
+
+      // design assumptions (the report's table, value and basis in separate cells)
+      push({ v: 'Design assumptions', s: S.SECTION });
+      const cols = ['Assumption'], pair = sections.length === 2; if (pair) cols.push('As installed', 'basis'); cols.push('Proposed', 'basis'); push(...head(cols));
+      const A = (label, f) => { const row = [T(label)]; sections.forEach(([nm, res, a, lang, sc]) => { const o = f(res, sc); row.push(o.num !== undefined ? o.num : T(o.text), T(o.note || '')); }); push(...row); };
+      const pmark = key => (res => ({ num: R(res.pressure[key].used, 3), note: modeText(res.pressure[key]) }));
+      A('Static pressure: fans (tunnel), in', pmark('fan'));
+      A('Static pressure: fans (min), in', pmark('fanMin'));
+      [['inlet', 'inlets'], ['inletFilter', 'inlet filters'], ['coolCell', 'cool cells'], ['filter', 'filters'], ['soffit', 'soffit'], ['shutter', 'shutters']]
+        .forEach(([k, l]) => A('Static pressure: ' + l + ', in', (res, sc) => ({ num: R(num(inst.sp[sc][k]), 3), note: 'entered' })));
+      A('Calculated static pressure, fan path, in', res => ({ num: R(res.totals.spCalc, 3) }));
+      A('Calculated static pressure, min-fan path, in', res => res.totals.spMinCalc > 0 ? { num: R(res.totals.spMinCalc, 3) } : { text: '—' });
+      A('Fan pressure check', res => ({ text: res.warnings.length ? res.warnings.join('\n') : 'OK' }));
+      A('Fan reduction, %', () => ({ num: R(frOf(config, inst), 1) }));
+      A('Head loss, in/100 ft', () => ({ num: R(hlOf(config, inst), 3) }));
+      A('Filter oversizing, %', () => ({ num: R(foOf(config, inst), 1) }));
+      A('Opening coefficient (soffit / shutter)', () => ({ num: R(ocOf(config, inst), 2) }));
+      const rng = r => r ? r[0] + '–' + r[1] : 'no limit';
+      A('Target: air exchange (max), sec', () => ({ text: rng(lim.airExchangeSec) })); A('Target: CFM / pig (max)', () => ({ text: rng(lim.flowMax) }));
+      A('Target: CFM / pig (min)', () => ({ text: rng(lim.flowMin) })); A('Target: air speed, ft/min', () => ({ text: rng(lim.airSpeed) }));
+      [['unverified', 'Workbook curves (no published table loaded)'], ['blocked', 'No usable curve: rated CFM needed'], ['beyond', 'Beyond published data'], ['rated', 'Inlets scaled from one published rating (square-root rule)'], ['override', 'Rated CFM override']]
+        .forEach(([k, l]) => { if (sections.some(([nm, res]) => res.flags[k].length)) A(l, res => ({ text: res.flags[k].length ? res.flags[k].join('\n') : '—' })); });
+      sheets.push({ name: b.type + ' - ' + b.inst.name, cols: [38, 26, 24, 40, 24, 14, 14, 14, 14, 16, 52], rows });
+    });
+    const safe = String(project).replace(/[\\/:*?"<>|]+/g, '-').trim().slice(0, 80) || 'Site';
+    return { filename: 'Ventilation - ' + safe + '.xlsx', sheets };
+  }
+  function exportXlsx(config, meta) {
+    const model = exportModel(config, meta);
+    return { filename: model.filename, mime: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', bytes: XLSXW.build(model.sheets), model };
+  }
+
   /* ---- catalog accessors (shared across all barns) ---- */
   const cat = {
     fan: {
@@ -5533,7 +5790,7 @@ const VENT = (function () {
     return hits.find(c => c.where === 'team') || hits[0] || null;   // the team's copy matters most
   }
 
-  return { mount, computeSection, scenarioInputs, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, photos, findDuplicateSite, renderReportSync, fanCfm, inletCfm, ocOf, modeOf, okOC, OC_DEFAULT, rowNotes, pickList };
+  return { mount, computeSection, scenarioInputs, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, photos, findDuplicateSite, renderReportSync, fanCfm, inletCfm, ocOf, modeOf, okOC, OC_DEFAULT, rowNotes, pickList, exportModel, exportXlsx };
 })();
 
 const TEAM_CONFIG = {
@@ -5971,6 +6228,24 @@ const SHELL = (function () {
     const t = el('div', 'toast', msg); document.body.appendChild(t);
     requestAnimationFrame(() => t.classList.add('show'));
     setTimeout(() => { t.classList.remove('show'); setTimeout(() => t.remove(), 300); }, 2600);
+  }
+
+  /* ---------- handing a file to the browser ---------- */
+  function downloadBlob(filename, blob) {
+    const a = document.createElement('a'), url = URL.createObjectURL(blob);
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 1500);
+  }
+  // On an iPad / iPhone the native share sheet ("Save to Files", "Open in Numbers / Excel") is the reliable way to keep a generated file, so it is tried first there (the Truss form
+  // does the same). Everywhere else it is a plain download. The share call must run inside the tap that asked for it, so nothing asynchronous happens before it.
+  // Returns 'shared', 'download' or 'abort' (the person closed the share sheet).
+  async function shareOrDownload(filename, blob, mime) {
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);   // iPadOS reports itself as a Mac
+    if (ios && navigator.canShare && typeof File === 'function') {
+      try { const file = new File([blob], filename, { type: mime }); if (navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title: filename }); return 'shared'; } }
+      catch (e) { if (e && e.name === 'AbortError') return 'abort'; /* anything else: fall through to a download */ }
+    }
+    downloadBlob(filename, blob); return 'download';
   }
 
   /* ---------- shared chrome ---------- */
@@ -6441,6 +6716,12 @@ const SHELL = (function () {
     const bState = el('button', 'btn', isPast(site) ? '↺ Reopen site' : '✓ Mark complete'); bState.title = isPast(site) ? 'Move this site back to Current sites to keep working on it' : 'Finished — move to Past sites (kept for reference)';
     bState.addEventListener('click', () => { const done = !isPast(site); setPast(site, done); toast(done ? 'Marked complete — kept under Past sites for reference.' : 'Reopened — back in Current sites.'); });
     const bSave = el('button', 'btn', '⤓ Export'); bSave.addEventListener('click', () => ventApi && ventApi.exportConfig());
+    const bXlsx = el('button', 'btn btn-xlsx', '📊 Export to Excel'); bXlsx.title = 'Download this site as an Excel workbook: a Summary sheet plus one sheet per barn';
+    bXlsx.addEventListener('click', () => {
+      if (!ventApi) return;
+      let x; try { x = VENT.exportXlsx(ventApi.snapshot(), meta()); } catch (e) { toast('Couldn’t make the Excel file: ' + (e && e.message || e)); return; }
+      shareOrDownload(x.filename, new Blob([x.bytes], { type: x.mime }), x.mime).then(how => { if (how !== 'abort') toast((how === 'shared' ? 'Shared ' : 'Exported ') + x.filename); }).catch(e => toast('Couldn’t save the Excel file: ' + (e && e.message || e)));
+    });
     const bLoad = el('button', 'btn', '⤒ Import'); const fileIn = el('input'); fileIn.type = 'file'; fileIn.accept = '.json,application/json'; fileIn.style.display = 'none';
     bLoad.addEventListener('click', () => fileIn.click());
     fileIn.addEventListener('change', e => { if (e.target.files[0] && ventApi) ventApi.importConfig(e.target.files[0]); fileIn.value = ''; });
@@ -6448,7 +6729,7 @@ const SHELL = (function () {
     const teamSite = teamOn(); let bUp = null;
     if (teamSite) { bUp = el('button', 'btn btn-upload', '⤒ Upload to team'); bUp.title = 'Share this site with the team'; bUp.addEventListener('click', () => { bUp.disabled = true; bUp.textContent = 'Uploading…'; syncUp(site, () => { bUp.disabled = false; bUp.textContent = '⤒ Upload to team'; paintSync(); }); }); }
 
-    root.appendChild(topNav({ back: 'Dashboard', leftEls: [nameInput], rightEls: (bUp ? [bUp] : []).concat([bReport, bState, bSave, bLoad, bReset, fileIn]) }));
+    root.appendChild(topNav({ back: 'Dashboard', leftEls: [nameInput], rightEls: (bUp ? [bUp] : []).concat([bReport, bXlsx, bState, bSave, bLoad, bReset, fileIn]) }));
 
     const details = el('div', 'proj-details');
     const field = (label, val, on, hint) => { const w = el('label', 'pd-field'); w.appendChild(el('span', 'pd-l', label)); const i = el('input', 'pd-in'); i.value = val || ''; if (hint) i.placeholder = hint; i.addEventListener('input', () => { on(i.value); site.updatedAt = Date.now(); save(); paintSync(); }); w.appendChild(i); return w; };
