@@ -261,6 +261,10 @@ em{font-style:italic;color:var(--muted)}
 .eq-note.info{color:var(--accent-700);font-weight:600}
 .fld-err{font-size:11px;color:var(--bad);min-height:13px}
 .bad-in{border-color:var(--bad)!important}
+/* static pressure boxes: the "Use 0 to 1 in." message takes no room until a value is refused (on the fan box it wraps onto its own line) */
+.sp-grid .fld-err,.sp-fan-body .fld-err{min-height:0}
+.sp-grid .fld-err:empty,.sp-fan-body .fld-err:empty{display:none}
+.sp-fan-body .fld-err{flex-basis:100%}
 
 /* ===== HYBRID: spreadsheet-style entry tables (full width, stacked) + polished dashboard ===== */
 .layout-hybrid .dashboard{order:-1;border-left:4px solid var(--brand)}
@@ -4442,6 +4446,9 @@ const VENT = (function () {
   // A farm-wide default with a per-barn value (like Fan Reduction and Head Loss); only 0.5 to 1.0 is accepted, anything else falls back to the default.
   const OC_MIN = 0.5, OC_MAX = 1.0, OC_DEFAULT = 0.8;
   const okOC = v => v !== '' && v != null && isFinite(+v) && +v >= OC_MIN && +v <= OC_MAX;
+  // Static pressure boxes (in. w.c.): only 0 – 1 is accepted. A number, or text that holds one; blank, spaces and anything else is refused.
+  const SP_MIN = 0, SP_MAX = 1;
+  const okSP = v => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && isFinite(+v) && +v >= SP_MIN && +v <= SP_MAX;
 
   /* ---- fan and inlet curves ----
      The workbook stores every fan and inlet as a quadratic in static pressure. Where a manufacturer's published table is available it sits in data.json as
@@ -5435,6 +5442,16 @@ const VENT = (function () {
       i.addEventListener('change', () => { if (!okOC(i.value)) { i.value = get(); i.classList.remove('bad-in'); msg.textContent = ''; } });
       const ig = $('div', 'ig'); ig.appendChild(i); w.appendChild(ig); w.appendChild(msg); if (ref) ref(i); return w;
     }
+    // Static pressure box: the same rule as Opening Coeff. - a value outside 0 to 1 is flagged and NOT stored (the stored value stays as it was), and the box shows the stored value again
+    // when it is left. `get` reads the stored value, `set` stores a typed one. Used by the six category boxes and by the fan / min-fan "Enter my own" box, in both scenarios.
+    function mkSpInput(get, set) {
+      const stored = () => { const v = get(); return v != null ? v : ''; };
+      const i = $('input'); i.type = 'number'; i.step = '0.01'; i.min = String(SP_MIN); i.max = String(SP_MAX); i.value = stored();
+      const msg = $('span', 'fld-err');
+      i.addEventListener('input', () => { if (okSP(i.value)) { set(i.value); i.classList.remove('bad-in'); msg.textContent = ''; schedule(); } else { i.classList.add('bad-in'); msg.textContent = 'Use ' + SP_MIN + ' to ' + SP_MAX + ' in.'; } });
+      i.addEventListener('change', () => { if (!okSP(i.value)) { i.value = stored(); i.classList.remove('bad-in'); msg.textContent = ''; } });
+      return { input: i, msg };
+    }
     if (engineering && !perBarn) {
       const fw = $('section', 'panel farmwide'); fw.appendChild($('h2', 'panel-h', 'Farm-Wide'));
       const fwg = $('div', 'building-grid');
@@ -5583,7 +5600,7 @@ const VENT = (function () {
         const spP = $('div', 'panel sp-panel'); spP.appendChild($('h3', 'panel-h', 'Static Pressure (in. w.c.)'));
         const spG = $('div', 'sp-grid');
         ['fan', 'fanMin'].forEach(k => { const w = $('div', 'fld sp-fan'); w.appendChild($('span', 'fl', k === 'fan' ? 'Fans (tunnel)' : 'Fans (min)')); const body = $('div', 'sp-fan-body'); w.appendChild(body); SPF[sec + '.' + k] = { body, inst, sec, k, shown: null }; spG.appendChild(w); });
-        [['inlet', 'Inlets'], ['inletFilter', 'Inlet Filters'], ['coolCell', 'Cool Cells'], ['filter', 'Filters'], ['soffit', 'Soffit'], ['shutter', 'Shutter']].forEach(([k, label]) => { const w = $('label', 'fld'); w.appendChild($('span', 'fl', label)); const i = $('input'); i.type = 'number'; i.step = '0.01'; i.value = inst.sp[sec][k]; i.addEventListener('input', () => { inst.sp[sec][k] = i.value; schedule(); }); w.appendChild(i); spG.appendChild(w); });
+        [['inlet', 'Inlets'], ['inletFilter', 'Inlet Filters'], ['coolCell', 'Cool Cells'], ['filter', 'Filters'], ['soffit', 'Soffit'], ['shutter', 'Shutter']].forEach(([k, label]) => { const w = $('label', 'fld'); w.appendChild($('span', 'fl', label)); const si = mkSpInput(() => inst.sp[sec][k], v => { inst.sp[sec][k] = v; }); w.appendChild(si.input); w.appendChild(si.msg); spG.appendChild(w); });
         spP.appendChild(spG);
         spP.appendChild($('p', 'sp-note', 'Fans are rated at the pressure the air path needs (calculated). Use “Enter my own” for a measured pressure, e.g. a manometer reading.'));
         const sw = $('div', 'sp-warn'); sw.hidden = true; RES[sec + '.spwarn'] = sw; spP.appendChild(sw);
@@ -5706,13 +5723,13 @@ const VENT = (function () {
       if (entered && ref.shown === 'entered') return;      // never rebuild an input that is being typed in
       const body = ref.body; body.innerHTML = '';
       if (entered) {
-        const i = $('input'); i.type = 'number'; i.step = '0.01'; i.value = inst.sp[sec][key] != null ? inst.sp[sec][key] : ''; i.placeholder = tr3(P.used); i.addEventListener('input', () => { inst.sp[sec][key] = i.value; schedule(); });
+        const si = mkSpInput(() => inst.sp[sec][key], v => { inst.sp[sec][key] = v; }), i = si.input; i.placeholder = tr3(P.used);
         const lk = $('button', 'sp-link', 'Use calculated'); lk.type = 'button'; lk.title = key === 'fan' ? 'Rate the fans at the pressure the filters, cool cells and head loss add up to' : 'Rate the min fans at the soffit + inlet filter + inlet pressure';
         lk.addEventListener('click', () => { setMode(inst, sec, key, 'calc'); ref.shown = null; schedule(); });
-        body.appendChild(i); body.appendChild(lk); ref.shown = 'entered'; ref.val = null; if (ref.focus) { ref.focus = false; i.focus(); i.select(); }
+        body.appendChild(i); body.appendChild(lk); body.appendChild(si.msg); ref.shown = 'entered'; ref.val = null; if (ref.focus) { ref.focus = false; i.focus(); i.select(); }
       } else {
         const v = $('b', 'sp-val', tr3(P.used)), tag = $('span', 'sp-tag', 'calculated'), lk = $('button', 'sp-link', 'Enter my own'); lk.type = 'button'; lk.title = 'Type a measured pressure instead (for example a manometer reading)';
-        lk.addEventListener('click', () => { inst.sp[sec][key] = tr3(P.used); setMode(inst, sec, key, 'entered'); ref.shown = null; ref.focus = true; schedule(); });
+        lk.addEventListener('click', () => { if (okSP(tr3(P.used))) inst.sp[sec][key] = tr3(P.used); setMode(inst, sec, key, 'entered'); ref.shown = null; ref.focus = true; schedule(); });
         body.appendChild(v); body.appendChild(tag); body.appendChild(lk); ref.shown = 'calc'; ref.val = v;
       }
     }
@@ -5790,7 +5807,7 @@ const VENT = (function () {
     return hits.find(c => c.where === 'team') || hits[0] || null;   // the team's copy matters most
   }
 
-  return { mount, computeSection, scenarioInputs, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, photos, findDuplicateSite, renderReportSync, fanCfm, inletCfm, ocOf, modeOf, okOC, OC_DEFAULT, rowNotes, pickList, exportModel, exportXlsx };
+  return { mount, computeSection, scenarioInputs, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, photos, findDuplicateSite, renderReportSync, fanCfm, inletCfm, ocOf, modeOf, okOC, okSP, SP_MIN, SP_MAX, OC_DEFAULT, rowNotes, pickList, exportModel, exportXlsx };
 })();
 
 const TEAM_CONFIG = {
