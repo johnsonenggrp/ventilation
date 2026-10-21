@@ -3155,7 +3155,7 @@ const VENT_DATA = {
           "filter": [
             {
               "mfg": "AAF Flanders",
-              "type": "SuperFlowV_MERV-15",
+              "type": "VariCelVXLRC_MERV-15",
               "qty": 603,
               "w": 24,
               "h": 24
@@ -3395,7 +3395,7 @@ const VENT_DATA = {
           "filter": [
             {
               "mfg": "AAF Flanders",
-              "type": "SuperFlowV_MERV-15",
+              "type": "VariCelVXLRC_MERV-15",
               "qty": 603,
               "w": 24,
               "h": 24
@@ -3650,7 +3650,7 @@ const VENT_DATA = {
           "filter": [
             {
               "mfg": "AAF Flanders",
-              "type": "SuperFlowV_MERV-15",
+              "type": "VariCelVXLRC_MERV-15",
               "qty": 652,
               "w": 24,
               "h": 24
@@ -3894,7 +3894,7 @@ const VENT_DATA = {
           "filter": [
             {
               "mfg": "AAF Flanders",
-              "type": "SuperFlowV_MERV-15",
+              "type": "VariCelVXLRC_MERV-15",
               "qty": 603,
               "w": 24,
               "h": 24
@@ -4123,7 +4123,7 @@ const VENT_DATA = {
           "filter": [
             {
               "mfg": "AAF Flanders",
-              "type": "SuperFlowV_MERV-15",
+              "type": "VariCelVXLRC_MERV-15",
               "qty": 9,
               "w": 24,
               "h": 24
@@ -4392,7 +4392,7 @@ const VENT_DATA = {
           "filter": [
             {
               "mfg": "AAF Flanders",
-              "type": "SuperFlowV_MERV-15",
+              "type": "VariCelVXLRC_MERV-15",
               "qty": 603,
               "w": 24,
               "h": 24
@@ -4786,7 +4786,7 @@ const VENT = (function () {
       return [{ mfg: s.mfg, type: s.type, qty: String(Math.max(1, Math.ceil(ref * margin / cfmEach))), w: String(w), h: String(h) }];
     };
     const inletFilterRows = wants('inletFilter') ? areaRows(D.inletFilters, cat.inletFilter, 'inletFilter', inletCap, 'BioCelVXLRC_MERV-16', 'inletFilter', FF) : [];
-    const filterRows = wants('filter') ? areaRows(D.filters, cat.filter, 'filter', fanMax * R, 'SuperFlowV_MERV-15', 'filter', FF) : [];
+    const filterRows = wants('filter') ? areaRows(D.filters, cat.filter, 'filter', fanMax * R, 'VariCelVXLRC_MERV-15', 'filter', FF) : [];
 
     // --- cool cells: cover max fan capacity (+10%); pad is 6 ft tall (JEG's C23 plans; CF's workbook examples use 5), length limited to the wall the barn has ---
     let coolRows = [], coolInfo = null;
@@ -4860,7 +4860,7 @@ const VENT = (function () {
       if (unv.length) warn('Workbook curves (no published table loaded): ' + unv.map(x => x.replace(/^Fan /, '')).join(', ') + ' — ' + (unv.length > 1 ? 'their CFM comes' : 'its CFM comes') + ' from the workbook’s curve, not a published table. Confirm ' + (unv.length > 1 ? 'them' : 'it') + ' with the manufacturer (or enter a rated CFM on the row) before specifying.');
       if (beyond.length) warn('This design relies on fan numbers past the published data: ' + beyond.map(x => x.replace(/^Fan /, '')).join('; ') + '. Treat the CFM as an estimate.'); }
     info('Sizing basis (JEG’s current workbook): inlet filters, cool cells, filters, shutters and soffit are each sized ' + Math.round((FF - 1) * 100) + '% above the flow they serve (the Filter Oversizing setting)' + (isFar ? '; the cool cells, filter bank and soffit serve the whole building: ' + R + ' rooms × ' + fmt(T.fanMax) + ' CFM = ' + fmt(T.fanMax * R) + ' CFM' : '') + '.');
-    info('Equipment: ' + (mine.length || pickRow('inlet', 'model') || pickRow('coolCell', 'name') ? 'what you picked on the Proposed side is kept; the rest is' : 'everything is') + ' JEG’s standard — Munters Vortex (' + (isFar ? 'rooms may also use PigTek Hero HO' : '24″ min-stage, 36–55″ tunnel') + '), DoubleL RD2400 ceiling inlets, Munters Aerotech CT pads, SuperFlowV MERV-15 filters, bird-screen soffit. Installed models are not carried over; pick a model on the Proposed side and re-run to use something else.');
+    info('Equipment: ' + (mine.length || pickRow('inlet', 'model') || pickRow('coolCell', 'name') ? 'what you picked on the Proposed side is kept; the rest is' : 'everything is') + ' JEG’s standard — Munters Vortex (' + (isFar ? 'rooms may also use PigTek Hero HO' : '24″ min-stage, 36–55″ tunnel') + '), DoubleL RD2400 ceiling inlets, Munters Aerotech CT pads, VariCel VXL MERV-15 filters, bird-screen soffit. Installed models are not carried over; pick a model on the Proposed side and re-run to use something else.');
     const inPer = Math.ceil(inletQty / inletRowsN);
     info('Ceiling inlets: ' + inletQty + '× ' + inletName + ' = ' + fmt(inletCap) + ' CFM (' + Math.round(inletCap / fanMax * 100) + '% of max fan capacity' + (inv > 0 ? ', ' + Math.round(inletCap / inv) + ' CFM/pig' : '') + '). They carry the min / mild-weather stages — CF’s real designs run 20–25%' + (!isFar ? ' (67 CFM/pig in the Gestation example; PIC’s wean-to-finish target is 35–50)' : '') + '; the cool cells and filter bank carry max ventilation. Layout: ' + inletRowsN + ' row' + (inletRowsN > 1 ? 's' : '') + ' of ~' + inPer + (L > 0 && inPer > 1 ? ', one every ~' + Math.round(L / inPer) + ' ft' : '') + ' (published spacing: no more than ~25–30 ft apart across the barn, 20–25 ft apart along it).');
     if (soffitInfo) {
