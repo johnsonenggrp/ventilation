@@ -4648,15 +4648,15 @@ const VENT = (function () {
   function toAdd(config, inst, limits, scenario) {
     scenario = scenario || 'proposed';
     const q = scenarioInputs(config, inst, scenario), prop = computeSection(q.b, q.sp, inst.rows[scenario], limits), ex = computeSection(q.b, q.sp, inst.rows.existing, limits), out = {};
-    const tr = x => String(+(+x).toFixed(2)), nm = s => String(s || '').replace(/_/g, ' '), who = r => [r.mfg, r.model].filter(Boolean).join(' ');
-    const filt = (r, rr) => num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0 ? { key: [r.mfg, r.type, num(r.w), num(r.h)].join('|'), unit: rr.cfmEach, text: n => n + ' × ' + tr(r.w) + '×' + tr(r.h) + ' in. ' + nm(r.type) } : null;
+    const tr = x => String(+(+x).toFixed(2)), nm = s => String(s || '').replace(/_/g, ' '), who = r => [r.mfg, r.model].filter(Boolean).join(' '), pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');   // the count is always a plain noun phrase ("6 cool cells, each 36 ft wide × 5 ft tall"), never "6 × 36 ft", which reads as 6 ft by 36 ft
+    const filt = noun => (r, rr) => num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0 ? { key: [r.mfg, r.type, num(r.w), num(r.h)].join('|'), unit: rr.cfmEach, text: n => pl(n, noun) + ', each ' + tr(r.w) + '×' + tr(r.h) + ' in. (' + nm(r.type) + ')' } : null;
     const UNIT = {   // one existing row -> null (not a piece of anything) or { key (same key = same size), unit: CFM of ONE piece, text(n) }
-      inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? { key: [r.mfg, r.model].join('|'), unit: rr.cfm, text: n => n + ' × ' + who(r) } : null,
-      inletFilter: filt,
-      coolCell: (r, rr) => num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0 ? { key: [r.mfg, r.name, num(r.lenFt), num(r.htFt)].join('|'), unit: rr.cap, text: n => n + ' × ' + tr(r.lenFt) + ' ft ' + (r.name ? r.name + ' ' : '') + 'pad (' + tr(r.htFt) + ' ft high)' } : null,
-      filter: filt,
+      inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? { key: [r.mfg, r.model].join('|'), unit: rr.cfm, text: n => pl(n, 'inlet') + ' (' + who(r) + ')' } : null,
+      inletFilter: filt('inlet filter'),
+      coolCell: (r, rr) => num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0 ? { key: [r.mfg, r.name, num(r.lenFt), num(r.htFt)].join('|'), unit: rr.cap, text: n => pl(n, 'cool cell') + ', each ' + tr(r.lenFt) + ' ft wide × ' + tr(r.htFt) + ' ft tall' + (r.name ? ' (' + r.name + ')' : '') } : null,
+      filter: filt('filter'),
       soffit: (r, rr) => num(r.lenFt) > 0 && rr.total > 0 ? { key: [r.type, num(r.widthIn)].join('|'), unit: rr.total / num(r.lenFt), text: n => n + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit' } : null,
-      shutter: (r, rr) => num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0 && rr.total > 0 ? { key: [num(r.lenFt), num(r.widthIn)].join('|'), unit: rr.total / num(r.number), text: n => n + ' × ' + tr(r.lenFt) + ' ft × ' + tr(r.widthIn) + ' in. shutter' } : null
+      shutter: (r, rr) => num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0 && rr.total > 0 ? { key: [num(r.lenFt), num(r.widthIn)].join('|'), unit: rr.total / num(r.number), text: n => pl(n, 'shutter') + ', each ' + tr(r.lenFt) + ' ft long × ' + tr(r.widthIn) + ' in. wide' } : null
     };
     Object.keys(UNIT).forEach(k => {
       const c = prop.checks[k]; if (!(c && prop.totals[k] > 0)) return;      // the proposed side has none of this
