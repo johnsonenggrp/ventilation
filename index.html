@@ -218,6 +218,12 @@ em{font-style:italic;color:var(--muted)}
 }
 
 .cat-foot{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px;padding-top:8px;border-top:2px solid var(--line)}
+.cat-add{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 10px;margin-top:8px;padding:8px 12px;background:var(--accent-50);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:8px;font-size:13px}
+.cat-add[hidden]{display:none}
+.ca-label{font-size:10px;font-weight:700;color:var(--accent-700);text-transform:uppercase;letter-spacing:.4px}
+.ca-opt{font-family:var(--mono);font-size:13px;color:var(--ink)}
+.ca-or{font-size:11px;font-style:italic;color:var(--muted)}
+.ca-sub{flex-basis:100%;font-size:11.5px;color:var(--muted)}
 .cat-total{display:flex;flex-direction:column}
 .ct-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
 .ct-line{display:flex;align-items:baseline;gap:4px}
@@ -4632,6 +4638,37 @@ const VENT = (function () {
     return { barns, counts: { total: barns.length, ok: barns.filter(x => x.status === 'ok').length, bad: barns.filter(x => x.status === 'bad').length, incomplete: barns.filter(x => x.status === 'incomplete').length, repairs: barns.reduce((s, b) => s + b.repairs, 0), needRepair: barns.filter(b => b.repairs > 0).length } };
   }
 
+  /* ---- "To add": what the existing equipment leaves to buy, counted in the sizes already in the barn ----
+     The proposed side is a whole design (one pad row of 269 ft, 40 shutters, ...). Someone remodelling a barn wants to know how many MORE of the pieces they already have it
+     takes: "4 pads of 53 ft", not "212 ft". For every category except fans (which fans stay is a choice, not arithmetic):
+       need = what the proposed side provides, or what its own sufficiency check requires if that is more;
+       have = the EXISTING rows rated at the PROPOSED pressures (that is how they will run after the remodel);
+       each distinct existing size gives one option: n = ceil((need - have) / the capacity of one piece). Soffit is a run, so its n is feet.
+     A category is left out when the proposed side does not use it or the existing side has no pieces of it. Display only: nothing here changes a row or a total. */
+  function toAdd(config, inst, limits, scenario) {
+    scenario = scenario || 'proposed';
+    const q = scenarioInputs(config, inst, scenario), prop = computeSection(q.b, q.sp, inst.rows[scenario], limits), ex = computeSection(q.b, q.sp, inst.rows.existing, limits), out = {};
+    const tr = x => String(+(+x).toFixed(2)), nm = s => String(s || '').replace(/_/g, ' '), who = r => [r.mfg, r.model].filter(Boolean).join(' ');
+    const filt = (r, rr) => num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0 ? { key: [r.mfg, r.type, num(r.w), num(r.h)].join('|'), unit: rr.cfmEach, text: n => n + ' × ' + tr(r.w) + '×' + tr(r.h) + ' in. ' + nm(r.type) } : null;
+    const UNIT = {   // one existing row -> null (not a piece of anything) or { key (same key = same size), unit: CFM of ONE piece, text(n) }
+      inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? { key: [r.mfg, r.model].join('|'), unit: rr.cfm, text: n => n + ' × ' + who(r) } : null,
+      inletFilter: filt,
+      coolCell: (r, rr) => num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0 ? { key: [r.mfg, r.name, num(r.lenFt), num(r.htFt)].join('|'), unit: rr.cap, text: n => n + ' × ' + tr(r.lenFt) + ' ft ' + (r.name ? r.name + ' ' : '') + 'pad (' + tr(r.htFt) + ' ft high)' } : null,
+      filter: filt,
+      soffit: (r, rr) => num(r.lenFt) > 0 && rr.total > 0 ? { key: [r.type, num(r.widthIn)].join('|'), unit: rr.total / num(r.lenFt), text: n => n + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit' } : null,
+      shutter: (r, rr) => num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0 && rr.total > 0 ? { key: [num(r.lenFt), num(r.widthIn)].join('|'), unit: rr.total / num(r.number), text: n => n + ' × ' + tr(r.lenFt) + ' ft × ' + tr(r.widthIn) + ' in. shutter' } : null
+    };
+    Object.keys(UNIT).forEach(k => {
+      const c = prop.checks[k]; if (!(c && prop.totals[k] > 0)) return;      // the proposed side has none of this
+      const seen = {}, sizes = [];
+      (inst.rows.existing[k] || []).forEach((r, i) => { const rr = r && ex.rows[k][i], u = rr ? UNIT[k](r, rr) : null; if (u && !seen[u.key]) { seen[u.key] = true; sizes.push(u); } });
+      const have = ex.totals[k]; if (!sizes.length || !(have > 0)) return;
+      const need = Math.max(prop.totals[k], c.ref > 0 ? c.ref : 0), gap = need - have, covered = gap <= need * 1e-9;
+      out[k] = { have, need, covered, options: covered ? [] : sizes.map(u => { const n = Math.ceil(gap / u.unit - 1e-9); return { n, unit: u.unit, text: u.text(n) }; }) };
+    });
+    return out;
+  }
+
   /* ---- proposed-design auto-sizer: size equipment to meet the targets, as an editable starting point ----
      Built the way real swine barns are, calibrated against the workbook's own proposed designs (e.g. the 412.5×61 Gestation barn:
      22 fans, 45 ceiling inlets, 180 inlet filters, 331 ft of 7" soffit, ~250 ft of 5 ft cool cell, ~580 filters):
@@ -5706,7 +5743,9 @@ const VENT = (function () {
       if (ck === 'fan') { foot.appendChild(totalSlot(sec, 'fanMin', isFar ? 'Room Cap (Min)' : 'Total Cap (Min)', 'CFM')); foot.appendChild(totalSlot(sec, 'fanMax', isFar ? 'Room Cap (Max)' : 'Total Cap (Max)', 'CFM')); }
       else if (ck === 'coolCell') { foot.appendChild(totalSlot(sec, 'coolCellArea', 'Total Area', 'SF')); foot.appendChild(totalSlot(sec, 'coolCell', 'Total Capacity', 'CFM')); }
       else foot.appendChild(totalSlot(sec, cfg.group, 'Total Capacity', 'CFM'));
-      block.appendChild(foot); return block;
+      block.appendChild(foot);
+      if (ck !== 'fan' && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'); add.hidden = true; RES[sec + '.add.' + ck] = add; block.appendChild(add); }   // "To add": filled in by paintAdd
+      return block;
     }
     function totalSlot(sec, key, label, unit) { const d = $('div', 'cat-total'); d.appendChild($('span', 'ct-label', label)); const v = $('span', 'ct-val'); const line = $('div', 'ct-line'); line.appendChild(v); line.appendChild($('span', 'ct-unit', unit)); d.appendChild(line); RES[sec + '.tot.' + key] = v; return d; }
     function populateSelect(sel, items, current) { sel.innerHTML = ''; const b = $('option', null, '—'); b.value = ''; sel.appendChild(b); items.forEach(it => { const o = $('option', null, it); o.value = it; if (it === current) o.selected = true; sel.appendChild(o); }); if (current && items.indexOf(current) === -1) { const o = $('option', null, current); o.value = current; o.selected = true; sel.appendChild(o); } sel.value = current || ''; }
@@ -5732,6 +5771,17 @@ const VENT = (function () {
         lk.addEventListener('click', () => { if (okSP(tr3(P.used))) inst.sp[sec][key] = tr3(P.used); setMode(inst, sec, key, 'entered'); ref.shown = null; ref.focus = true; schedule(); });
         body.appendChild(v); body.appendChild(tag); body.appendChild(lk); ref.shown = 'calc'; ref.val = v;
       }
+    }
+    // the "To add" line under each proposed table: how many more of the sizes already in the barn it takes (see toAdd)
+    function paintAdd(sec, ta) {
+      CAT_ORDER.forEach(ck => {
+        const el = RES[sec + '.add.' + ck]; if (!el) return;
+        const r = ta[ck]; el.innerHTML = ''; el.hidden = !r; if (!r) return;
+        el.appendChild($('span', 'ca-label', 'To add'));
+        if (r.covered) el.appendChild($('b', 'ca-opt', 'nothing, the existing ' + CATS[ck].title.toLowerCase() + ' already covers it'));
+        else r.options.forEach((o, i) => { if (i) el.appendChild($('span', 'ca-or', 'or')); el.appendChild($('b', 'ca-opt', o.text)); });
+        el.appendChild($('span', 'ca-sub', 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
+      });
     }
     // the notes under a fan / inlet row: which curve is behind the numbers
     function paintRowNote(refs, rr, ck, state) {
@@ -5765,6 +5815,7 @@ const VENT = (function () {
         rangeSub(sec + '.airExchSec.sub', res.ranges.airExch, limits.airExchangeSec); rangeSub(sec + '.perHeadMax.sub', res.ranges.perHeadMax, limits.flowMax); rangeSub(sec + '.perHeadMin.sub', res.ranges.perHeadMin, limits.flowMin); rangeSub(sec + '.airSpeedMax.sub', res.ranges.airSpeed, limits.airSpeed);
         Object.keys(res.checks).forEach(k => { const chip = RES[sec + '.chk.' + k]; if (!chip) return; const c = res.checks[k]; const st = chip.querySelector('.chip-status'); const present = c.cap > 0, judged = present && c.ref > 0; st.textContent = !present ? 'none' : (c.ref > 0 ? (c.ok ? 'Sufficient' : 'Insufficient') : '—'); chip.classList.toggle('ok', judged && c.ok); chip.classList.toggle('bad', judged && !c.ok); chip.classList.toggle('na', !judged); });
       });
+      if (scenarios.indexOf('existing') >= 0) scenarios.filter(sec => sec !== 'existing').forEach(sec => paintAdd(sec, toAdd(STATE, inst, limits, sec)));
       if (RES.__status && dualStatus) {
         // one verdict per scenario shown: Existing is judged as installed, Proposed against the design targets
         const segs = scenarios.map(sec => {
@@ -5807,7 +5858,7 @@ const VENT = (function () {
     return hits.find(c => c.where === 'team') || hits[0] || null;   // the team's copy matters most
   }
 
-  return { mount, computeSection, scenarioInputs, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, photos, findDuplicateSite, renderReportSync, fanCfm, inletCfm, ocOf, modeOf, okOC, okSP, SP_MIN, SP_MAX, OC_DEFAULT, rowNotes, pickList, exportModel, exportXlsx };
+  return { mount, computeSection, scenarioInputs, cat, CATS, fmt, data: D, sampleSnapshot, blankSnapshot, renderReport, summarize, recommendProposed, toAdd, photos, findDuplicateSite, renderReportSync, fanCfm, inletCfm, ocOf, modeOf, okOC, okSP, SP_MIN, SP_MAX, OC_DEFAULT, rowNotes, pickList, exportModel, exportXlsx };
 })();
 
 const TEAM_CONFIG = {
