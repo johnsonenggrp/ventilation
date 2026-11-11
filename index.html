@@ -224,6 +224,11 @@ em{font-style:italic;color:var(--muted)}
 .ca-opt{font-family:var(--mono);font-size:13px;color:var(--ink)}
 .ca-or{font-size:11px;font-style:italic;color:var(--muted)}
 .ca-sub{flex-basis:100%;font-size:11.5px;color:var(--muted)}
+.ca-body{display:contents}
+.ca-ctl{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px;font-size:12px;color:var(--ink)}
+.ca-ctl input{width:70px;padding:3px 6px;border:1px solid var(--in-line);background:var(--in-bg);border-radius:6px;font:inherit;font-family:var(--mono)}
+.ca-ctl input.bad-in{border-color:var(--bad);background:var(--bad-bg)}
+.ca-hint{font-size:11px;font-style:italic;color:var(--muted)}
 .cat-total{display:flex;flex-direction:column}
 .ct-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
 .ct-line{display:flex;align-items:baseline;gap:4px}
@@ -4455,6 +4460,9 @@ const VENT = (function () {
   // Static pressure boxes (in. w.c.): only 0 – 1 is accepted. A number, or text that holds one; blank, spaces and anything else is refused.
   const SP_MIN = 0, SP_MAX = 1;
   const okSP = v => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && isFinite(+v) && +v >= SP_MIN && +v <= SP_MAX;
+  // Pad height (ft) for the "To add" cool cell options: a number above 0 and up to 20. Anything else is ignored (the existing pads' own heights are used).
+  const PAD_H_MAX = 20;
+  const okPadH = v => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && isFinite(+v) && +v > 0 && +v <= PAD_H_MAX;
 
   /* ---- fan and inlet curves ----
      The workbook stores every fan and inlet as a quadratic in static pressure. Where a manufacturer's published table is available it sits in data.json as
@@ -4644,16 +4652,19 @@ const VENT = (function () {
        need = what the proposed side provides, or what its own sufficiency check requires if that is more;
        have = the EXISTING rows rated at the PROPOSED pressures (that is how they will run after the remodel);
        each distinct existing size gives one option: n = ceil((need - have) / the capacity of one piece). Soffit is a run, so its n is feet.
+     Cool cells: opts.padHeightFt (see okPadH) makes the new pads that many feet tall, with the existing lengths and the existing pad model's velocity; without it they are the
+     existing pads' own heights.
      A category is left out when the proposed side does not use it or the existing side has no pieces of it. Display only: nothing here changes a row or a total. */
-  function toAdd(config, inst, limits, scenario) {
+  function toAdd(config, inst, limits, scenario, opts) {
     scenario = scenario || 'proposed';
+    const H = opts && okPadH(opts.padHeightFt) ? +opts.padHeightFt : null;   // null = each existing pad's own height
     const q = scenarioInputs(config, inst, scenario), prop = computeSection(q.b, q.sp, inst.rows[scenario], limits), ex = computeSection(q.b, q.sp, inst.rows.existing, limits), out = {};
     const tr = x => String(+(+x).toFixed(2)), nm = s => String(s || '').replace(/_/g, ' '), who = r => [r.mfg, r.model].filter(Boolean).join(' '), pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');   // the count is always a plain noun phrase ("6 cool cells, each 36 ft wide × 5 ft tall"), never "6 × 36 ft", which reads as 6 ft by 36 ft
     const filt = noun => (r, rr) => num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0 ? { key: [r.mfg, r.type, num(r.w), num(r.h)].join('|'), unit: rr.cfmEach, text: n => pl(n, noun) + ', each ' + tr(r.w) + '×' + tr(r.h) + ' in. (' + nm(r.type) + ')' } : null;
     const UNIT = {   // one existing row -> null (not a piece of anything) or { key (same key = same size), unit: CFM of ONE piece, text(n) }
       inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? { key: [r.mfg, r.model].join('|'), unit: rr.cfm, text: n => pl(n, 'inlet') + ' (' + who(r) + ')' } : null,
       inletFilter: filt('inlet filter'),
-      coolCell: (r, rr) => num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0 ? { key: [r.mfg, r.name, num(r.lenFt), num(r.htFt)].join('|'), unit: rr.cap, text: n => pl(n, 'cool cell') + ', each ' + tr(r.lenFt) + ' ft wide × ' + tr(r.htFt) + ' ft tall' + (r.name ? ' (' + r.name + ')' : '') } : null,
+      coolCell: (r, rr) => { if (!(num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0)) return null; const h = H != null ? H : num(r.htFt); return { key: [r.mfg, r.name, num(r.lenFt), h].join('|'), unit: rr.vel * num(r.lenFt) * h, text: n => pl(n, 'cool cell') + ', each ' + tr(r.lenFt) + ' ft wide × ' + tr(h) + ' ft tall' + (r.name ? ' (' + r.name + ')' : '') }; },
       filter: filt('filter'),
       soffit: (r, rr) => num(r.lenFt) > 0 && rr.total > 0 ? { key: [r.type, num(r.widthIn)].join('|'), unit: rr.total / num(r.lenFt), text: n => n + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit' } : null,
       shutter: (r, rr) => num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0 && rr.total > 0 ? { key: [num(r.lenFt), num(r.widthIn)].join('|'), unit: rr.total / num(r.number), text: n => pl(n, 'shutter') + ', each ' + tr(r.lenFt) + ' ft long × ' + tr(r.widthIn) + ' in. wide' } : null
@@ -5417,6 +5428,7 @@ const VENT = (function () {
     const rawOC = inst => inst.openingCoeff != null ? inst.openingCoeff : (STATE.openingCoeff != null ? STATE.openingCoeff : OC_DEFAULT);   // undefined farm-wide = an older save: shows (and uses) the default without changing the save
     const scnLabel = { existing: 'Existing', proposed: 'Proposed Remodel' }; if (opts.labels) Object.keys(opts.labels).forEach(k => scnLabel[k] = opts.labels[k]);
     const LSKEY = 'cf_vent_config_v3';
+    const padHeightChoice = new WeakMap();   // barn -> the pad height typed in the "To add" box (this session only; it is a what-if, never saved with the site)
     root.classList.add('vent-app', 'layout-' + layout);
 
     const STATE = { fanReductionPct: D.farmWide.fanReductionPct, headLoss: D.farmWide.headLoss, filterOversizingPct: D.farmWide.filterOversizingPct, openingCoeff: OC_DEFAULT, types: types.slice(), instances: {}, activeType: types[0], idx: {} };
@@ -5744,7 +5756,7 @@ const VENT = (function () {
       else if (ck === 'coolCell') { foot.appendChild(totalSlot(sec, 'coolCellArea', 'Total Area', 'SF')); foot.appendChild(totalSlot(sec, 'coolCell', 'Total Capacity', 'CFM')); }
       else foot.appendChild(totalSlot(sec, cfg.group, 'Total Capacity', 'CFM'));
       block.appendChild(foot);
-      if (ck !== 'fan' && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'); add.hidden = true; RES[sec + '.add.' + ck] = add; block.appendChild(add); }   // "To add": filled in by paintAdd
+      if (ck !== 'fan' && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'), body = $('div', 'ca-body'); add.hidden = true; add.appendChild(body); RES[sec + '.add.' + ck] = add; RES[sec + '.addbody.' + ck] = body; block.appendChild(add); if (ck === 'coolCell') add.appendChild(buildPadHeightBox(inst, sec)); }   // "To add": filled in by paintAdd
       return block;
     }
     function totalSlot(sec, key, label, unit) { const d = $('div', 'cat-total'); d.appendChild($('span', 'ct-label', label)); const v = $('span', 'ct-val'); const line = $('div', 'ct-line'); line.appendChild(v); line.appendChild($('span', 'ct-unit', unit)); d.appendChild(line); RES[sec + '.tot.' + key] = v; return d; }
@@ -5773,14 +5785,27 @@ const VENT = (function () {
       }
     }
     // the "To add" line under each proposed table: how many more of the sizes already in the barn it takes (see toAdd)
-    function paintAdd(sec, ta) {
+    // The pad height box under the cool cell line (new pads are this many feet tall). Blank = the height of the pad row in the proposed table (6 ft from Recommend sizing); the box
+    // itself is never repainted, so typing in it is not interrupted. A value outside 0 to 20 is flagged and not used (the way the static pressure boxes refuse values).
+    function proposedPadHeight(inst, sec) { const row = ((inst.rows[sec] || {}).coolCell || []).find(r => r && num(r.htFt) > 0); return row ? num(row.htFt) : null; }   // function declarations: the first render runs before this point of the setup
+    function padHeightFor(inst, sec) { const c = padHeightChoice.get(inst); return c != null ? c : proposedPadHeight(inst, sec); }
+    function buildPadHeightBox(inst, sec) {
+      const w = $('label', 'ca-ctl'), i = $('input'), stored = () => { const c = padHeightChoice.get(inst); return c != null ? String(c) : ''; };
+      i.type = 'number'; i.min = '1'; i.max = String(PAD_H_MAX); i.step = '0.5'; i.value = stored(); i.title = 'How tall the new pads are, in feet. Leave blank to use the height in the proposed cool cell row.';
+      i.addEventListener('input', () => { if (i.value === '') { padHeightChoice.delete(inst); i.classList.remove('bad-in'); schedule(); } else if (okPadH(i.value)) { padHeightChoice.set(inst, +i.value); i.classList.remove('bad-in'); schedule(); } else i.classList.add('bad-in'); });
+      i.addEventListener('change', () => { if (!(i.value === '' || okPadH(i.value))) { i.value = stored(); i.classList.remove('bad-in'); } });
+      w.appendChild($('span', null, 'New pads are')); w.appendChild(i); w.appendChild($('span', null, 'ft tall')); w.appendChild($('span', 'ca-hint', '(blank = the height in the proposed row)'));
+      RES[sec + '.addH'] = i; return w;
+    }
+    function paintAdd(sec, ta, inst) {
       CAT_ORDER.forEach(ck => {
-        const el = RES[sec + '.add.' + ck]; if (!el) return;
-        const r = ta[ck]; el.innerHTML = ''; el.hidden = !r; if (!r) return;
-        el.appendChild($('span', 'ca-label', 'To add'));
-        if (r.covered) el.appendChild($('b', 'ca-opt', 'nothing, the existing ' + CATS[ck].title.toLowerCase() + ' already covers it'));
-        else r.options.forEach((o, i) => { if (i) el.appendChild($('span', 'ca-or', 'or')); el.appendChild($('b', 'ca-opt', o.text)); });
-        el.appendChild($('span', 'ca-sub', 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
+        const el = RES[sec + '.add.' + ck], body = RES[sec + '.addbody.' + ck]; if (!el || !body) return;
+        const r = ta[ck]; body.innerHTML = ''; el.hidden = !r; if (!r) return;
+        body.appendChild($('span', 'ca-label', 'To add'));
+        if (r.covered) body.appendChild($('b', 'ca-opt', 'nothing, the existing ' + CATS[ck].title.toLowerCase() + ' already covers it'));
+        else r.options.forEach((o, i) => { if (i) body.appendChild($('span', 'ca-or', 'or')); body.appendChild($('b', 'ca-opt', o.text)); });
+        body.appendChild($('span', 'ca-sub', 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
+        if (ck === 'coolCell') { const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; } }
       });
     }
     // the notes under a fan / inlet row: which curve is behind the numbers
@@ -5815,7 +5840,7 @@ const VENT = (function () {
         rangeSub(sec + '.airExchSec.sub', res.ranges.airExch, limits.airExchangeSec); rangeSub(sec + '.perHeadMax.sub', res.ranges.perHeadMax, limits.flowMax); rangeSub(sec + '.perHeadMin.sub', res.ranges.perHeadMin, limits.flowMin); rangeSub(sec + '.airSpeedMax.sub', res.ranges.airSpeed, limits.airSpeed);
         Object.keys(res.checks).forEach(k => { const chip = RES[sec + '.chk.' + k]; if (!chip) return; const c = res.checks[k]; const st = chip.querySelector('.chip-status'); const present = c.cap > 0, judged = present && c.ref > 0; st.textContent = !present ? 'none' : (c.ref > 0 ? (c.ok ? 'Sufficient' : 'Insufficient') : '—'); chip.classList.toggle('ok', judged && c.ok); chip.classList.toggle('bad', judged && !c.ok); chip.classList.toggle('na', !judged); });
       });
-      if (scenarios.indexOf('existing') >= 0) scenarios.filter(sec => sec !== 'existing').forEach(sec => paintAdd(sec, toAdd(STATE, inst, limits, sec)));
+      if (scenarios.indexOf('existing') >= 0) scenarios.filter(sec => sec !== 'existing').forEach(sec => paintAdd(sec, toAdd(STATE, inst, limits, sec, { padHeightFt: padHeightFor(inst, sec) }), inst));
       if (RES.__status && dualStatus) {
         // one verdict per scenario shown: Existing is judged as installed, Proposed against the design targets
         const segs = scenarios.map(sec => {
