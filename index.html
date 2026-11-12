@@ -224,6 +224,8 @@ em{font-style:italic;color:var(--muted)}
 .ca-opt{font-family:var(--mono);font-size:13px;color:var(--ink)}
 .ca-or{font-size:11px;font-style:italic;color:var(--muted)}
 .ca-sub{flex-basis:100%;font-size:11.5px;color:var(--muted)}
+.ca-list{flex-basis:100%;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:baseline}
+.ca-list .ca-or{text-align:right}
 .ca-body{display:contents}
 .ca-ctl{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px;font-size:12px;color:var(--ink)}
 .ca-ctl input{width:70px;padding:3px 6px;border:1px solid var(--in-line);background:var(--in-bg);border-radius:6px;font:inherit;font-family:var(--mono)}
@@ -4656,8 +4658,10 @@ const VENT = (function () {
        each distinct existing size gives one option: n = ceil((need - have) / the capacity of one piece). Soffit is a run, so its n is feet.
      Cool cells: opts.padHeightFt (see okPadH) makes the new pads that many feet tall, with the existing lengths and the existing pad model's velocity; without it they are the
      existing pads' own heights.
-     Filter bank: the pieces are frame units, 3H x 2W (6 filters) and 3H x 1W (3 filters) of each existing filter size (FILTER_UNIT_HIGH / FILTER_UNIT_WIDE), not single filters.
-     Cool cells and the filter bank also get one more option when there are two sizes to mix (the two pad lengths; the 2W and 1W units of one filter size): the mix of the two that
+     Filter bank: the pieces are frame units, 3H x 2W (6 filters) and 3H x 1W (3 filters) of each existing filter size (FILTER_UNIT_HIGH / FILTER_UNIT_WIDE), not single filters. The filter bank is
+     shown as a list: its options carry a `head`, the filter size and model said once for the choices under it ("24×24 in. VariCelVXLRC MERV-15 filters"), and their text is only the choice
+     ("52 units of 3H × 2W (312 filters)", "51 units of 3H × 2W plus 1 unit of 3H × 1W (309 filters)"). Options come out grouped: one group's sizes, then its mix, then the next group.
+     Cool cells, the filter bank and shutters also get one more option when there are two sizes to mix (the two pad lengths; the 2W and 1W units of one filter size; the two shutter sizes): the mix of the two that
      covers the need with the least over-build, at least one of each (so neither size is left over: take any one piece away and it no longer covers), fewest pieces on a tie.
      It is { mix: true, n: total pieces, total: CFM, parts: [{ n, unit }, { n, unit }], text }. It is left out when one piece of the larger size alone covers the need.
      A category is left out when the proposed side does not use it or the existing side has no pieces of it. Display only: nothing here changes a row or a total. */
@@ -4667,7 +4671,7 @@ const VENT = (function () {
     const q = scenarioInputs(config, inst, scenario), prop = computeSection(q.b, q.sp, inst.rows[scenario], limits), ex = computeSection(q.b, q.sp, inst.rows.existing, limits), out = {};
     const tr = x => String(+(+x).toFixed(2)), nm = s => String(s || '').replace(/_/g, ' '), who = r => [r.mfg, r.model].filter(Boolean).join(' '), pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');   // the count is always a plain noun phrase ("6 cool cells, each 36 ft wide × 5 ft tall"), never "6 × 36 ft", which reads as 6 ft by 36 ft
     // a piece: key (same key = same size), unit (CFM of ONE piece), bare(n) (the count and the size), tail (what is shared by every piece of the same kind, shown in brackets), and for the
-    // categories that can be mixed: group (only pieces of one group are mixed) and per (filters in one piece)
+    // categories that can be mixed: group (only pieces of one group are mixed; the options are listed group by group) and per (filters in one piece); listed: the tail is the option's head, not a bracket
     const piece = (key, unit, bare, tail, extra) => Object.assign({ key, unit, bare, tail: tail || '' }, extra);
     const UNIT = {   // one existing row -> null (not a piece of anything) or a list of pieces
       inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? [piece([r.mfg, r.model].join('|'), rr.cfm, n => pl(n, 'inlet'), who(r))] : null,
@@ -4676,15 +4680,16 @@ const VENT = (function () {
       filter: (r, rr) => {
         if (!(num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0)) return null;
         const size = [r.mfg, r.type, num(r.w), num(r.h)].join('|');
-        return FILTER_UNIT_WIDE.map(wide => piece(size + '|' + wide, rr.cfmEach * FILTER_UNIT_HIGH * wide, n => pl(n, 'filter unit') + ', each ' + FILTER_UNIT_HIGH + 'H × ' + wide + 'W', tr(r.w) + '×' + tr(r.h) + ' in. ' + nm(r.type), { group: size, per: FILTER_UNIT_HIGH * wide }));
+        return FILTER_UNIT_WIDE.map(wide => piece(size + '|' + wide, rr.cfmEach * FILTER_UNIT_HIGH * wide, n => pl(n, 'unit') + ' of ' + FILTER_UNIT_HIGH + 'H × ' + wide + 'W', tr(r.w) + '×' + tr(r.h) + ' in. ' + nm(r.type) + ' filters', { group: size, per: FILTER_UNIT_HIGH * wide, listed: true }));
       },
       soffit: (r, rr) => num(r.lenFt) > 0 && rr.total > 0 ? [piece([r.type, num(r.widthIn)].join('|'), rr.total / num(r.lenFt), n => n + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit')] : null,
-      shutter: (r, rr) => num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0 && rr.total > 0 ? [piece([num(r.lenFt), num(r.widthIn)].join('|'), rr.total / num(r.number), n => pl(n, 'shutter') + ', each ' + tr(r.lenFt) + ' ft long × ' + tr(r.widthIn) + ' in. wide')] : null
+      shutter: (r, rr) => num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0 && rr.total > 0 ? [piece([num(r.lenFt), num(r.widthIn)].join('|'), rr.total / num(r.number), n => pl(n, 'shutter') + ', each ' + tr(r.lenFt) + ' ft long × ' + tr(r.widthIn) + ' in. wide', '', { group: 'all' })] : null   // any two shutter sizes can be mixed (no height to keep the same)
     };
-    const MIXABLE = { coolCell: true, filter: true };
+    const MIXABLE = { coolCell: true, filter: true, shutter: true };
     // the words for one option: one part = a single size, two parts = a mix of the two. The bracket holds the filter count (frames only) and what the pieces share (pad model, filter size).
     const bracket = (parts, tail) => { const f = parts.reduce((s, p) => s + (p.u.per || 0) * p.n, 0), inner = [f ? f + ' filters' : '', tail].filter(Boolean).join(', '); return inner ? ' (' + inner + ')' : ''; };
     const words = parts => {
+      if (parts[0].u.listed) return parts.map(p => p.u.bare(p.n)).join(' plus ') + bracket(parts, '');   // the filter bank: what the filters are is the option's head, said once above the choices
       if (parts.length === 1) return parts[0].u.bare(parts[0].n) + bracket(parts, parts[0].u.tail);
       return parts.every(p => p.u.tail === parts[0].u.tail) ? 'a mix of ' + parts[0].u.bare(parts[0].n) + ' and ' + parts[1].u.bare(parts[1].n) + bracket(parts, parts[0].u.tail)
         : 'a mix of ' + words([parts[0]]) + ' and ' + words([parts[1]]);
@@ -4712,9 +4717,13 @@ const VENT = (function () {
       const have = ex.totals[k]; if (!sizes.length || !(have > 0)) return;
       const need = Math.max(prop.totals[k], c.ref > 0 ? c.ref : 0), gap = need - have, covered = gap <= need * 1e-9, options = [];
       if (!covered) {
-        sizes.forEach(u => { const n = Math.ceil(gap / u.unit - 1e-9); options.push({ n, unit: u.unit, text: words([{ u, n }]) }); });
-        if (MIXABLE[k]) { const groups = {}, order = []; sizes.forEach(u => { if (!groups[u.group]) { groups[u.group] = []; order.push(u.group); } groups[u.group].push(u); });
-          order.forEach(g => { const m = groups[g].length > 1 ? bestMix(groups[g], gap) : null; if (m) options.push({ mix: true, n: m.n, total: m.total, parts: m.parts.map(p => ({ n: p.n, unit: p.u.unit })), text: words(m.parts) }); }); }
+        const groups = {}, order = [], headOf = u => u.listed ? { head: u.tail } : {};   // the options come out group by group: its sizes, then its mix
+        sizes.forEach(u => { const g = u.group || ''; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(u); });
+        order.forEach(g => {
+          groups[g].forEach(u => { const n = Math.ceil(gap / u.unit - 1e-9); options.push(Object.assign({ n, unit: u.unit, text: words([{ u, n }]) }, headOf(u))); });
+          const m = MIXABLE[k] && groups[g].length > 1 ? bestMix(groups[g], gap) : null;
+          if (m) options.push(Object.assign({ mix: true, n: m.n, total: m.total, parts: m.parts.map(p => ({ n: p.n, unit: p.u.unit })), text: words(m.parts) }, headOf(m.parts[0].u)));
+        });
       }
       out[k] = { have, need, covered, options };
     });
@@ -5844,6 +5853,13 @@ const VENT = (function () {
         const r = ta[ck]; body.innerHTML = ''; el.hidden = !r; if (!r) return;
         body.appendChild($('span', 'ca-label', 'To add'));
         if (r.covered) body.appendChild($('b', 'ca-opt', 'nothing, the existing ' + CATS[ck].title.toLowerCase() + ' already covers it'));
+        else if (r.options.some(o => o.head)) {   // a list (the filter bank): the filter size and model once, then one choice per row; a second filter size gets its own heading after an "or"
+          const list = $('div', 'ca-list'); let prev = null, row = 0;
+          r.options.forEach(o => {
+            if (o.head !== prev) { if (prev === null) { body.appendChild($('b', 'ca-opt', o.head)); body.appendChild(list); } else { list.appendChild($('span', 'ca-or', 'or')); list.appendChild($('b', 'ca-opt', o.head)); } prev = o.head; row = 0; }
+            list.appendChild(row ? $('span', 'ca-or', 'or') : $('span', 'ca-lead')); list.appendChild($('b', 'ca-opt', o.text)); row++;
+          });
+        }
         else r.options.forEach((o, i) => { if (i) body.appendChild($('span', 'ca-or', 'or')); body.appendChild($('b', 'ca-opt', o.text)); });
         body.appendChild($('span', 'ca-sub', 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
         if (ck === 'coolCell') { const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; } }
