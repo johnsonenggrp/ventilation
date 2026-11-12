@@ -4674,7 +4674,10 @@ const VENT = (function () {
      that is NOT in the barn (4 AP inlets in the barn, 6 DoubleL in the table) that reads like a contradiction, so the line says what it is: the add options start "keep the 4 AP ACI-2-4000 and add"
      (inline when there is one option, as a heading over the choices when there are several) and one more option, { replace: true, text }, is the proposed table's own rows ("replace them with
      6 inlets (DoubleL ...), as in the table above"), so it can never disagree with the table; when the table is itself short of what its own check needs (the proposed fans want more inlet flow
-     than the table's inlets give) it adds "(13,182 CFM, short of the 28,836 CFM needed)". The answer then says `list: true`. Pads and shutters do not get it.
+     than the table's inlets give) it adds "(13,182 CFM, short of the 28,836 CFM needed)". The answer then says `list: true`. Shutters do not get it.
+     Cool cells get their own replace choice, because the proposed table is one long run, not countable cells: when the new cells are not the cells in the barn (a different height than the existing
+     pads, or a pad model that is not in the barn) the add choices become "keep the existing pads and add ..." and one more choice per cell size says how many of the new cells the whole
+     need takes if the existing pads come out: "replace them with 9 cool cells, each 36 ft wide × 5 ft tall (Aerotech CT)" (all of the need, counted at the PROPOSED pad model's velocity).
      A category is left out when the proposed side does not use it or the existing side has no pieces of it. Display only: nothing here changes a row or a total. */
   function toAdd(config, inst, limits, scenario, opts) {
     scenario = scenario || 'proposed';
@@ -4689,7 +4692,7 @@ const VENT = (function () {
     const UNIT = {   // one existing row -> null (not a piece of anything) or a list of pieces
       inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? [piece([r.mfg, r.model].join('|'), rr.cfm, n => pl(n, 'inlet'), who(r), { haveN: num(r.qty), haveText: n => n + ' ' + who(r), plain: n => pl(n, 'inlet') + ' (' + who(r) + ')' })] : null,
       inletFilter: (r, rr) => num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0 ? [piece([r.mfg, r.type, num(r.w), num(r.h)].join('|'), rr.cfmEach, n => pl(n, 'inlet filter') + ', each ' + tr(r.w) + '×' + tr(r.h) + ' in.', nm(r.type), { haveN: num(r.qty), haveText: n => n + ' ' + nm(r.type) + ' (' + tr(r.w) + '×' + tr(r.h) + ' in.)', plain: n => pl(n, 'inlet filter') + ', each ' + tr(r.w) + '×' + tr(r.h) + ' in. (' + nm(r.type) + ')' })] : null,
-      coolCell: (r, rr) => { if (!(num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0)) return null; const h = H != null ? H : num(r.htFt), len = W != null ? W : num(r.lenFt); return [piece([r.mfg, r.name, len, h].join('|'), rr.vel * len * h, n => pl(n, 'cool cell') + ', each ' + tr(len) + ' ft wide × ' + tr(h) + ' ft tall', r.name ? r.name + ' cool cells' : '', { group: String(h), listed: true })]; },
+      coolCell: (r, rr) => { if (!(num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0)) return null; const h = H != null ? H : num(r.htFt), len = W != null ? W : num(r.lenFt); return [piece([r.mfg, r.name, len, h].join('|'), rr.vel * len * h, n => pl(n, 'cool cell') + ', each ' + tr(len) + ' ft wide × ' + tr(h) + ' ft tall', r.name ? r.name + ' cool cells' : '', { group: String(h), listed: true, len, h })]; },
       filter: (r, rr) => {
         if (!(num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0)) return null;
         const size = [r.mfg, r.type, num(r.w), num(r.h)].join('|');
@@ -4735,6 +4738,15 @@ const VENT = (function () {
         (inst.rows[scenario][k] || []).forEach((r, i) => { const rr = r && prop.rows[k][i], us = rr ? UNIT[k](r, rr) : null, u = us && us[0]; if (!u) return; const g = u.group || u.key; if (!pseen[g]) { pseen[g] = u; theirs.push(u); } else pseen[g].haveN += u.haveN; });
         if (theirs.some(u => !mine[u.group || u.key])) replace = 'replace them with ' + theirs.map(u => u.plain(u.haveN)).join(' plus ') + ', as in the table above' + (prop.totals[k] < need * (1 - 1e-9) ? ' (' + fmt(prop.totals[k]) + ' CFM, short of the ' + fmt(need) + ' CFM needed)' : '');   // when the table itself is short of what its own check needs, say so
       }
+      const padReplace = [];   // cool cells: the same cell sizes, all new, when the existing pads are to come out
+      if (!covered && k === 'coolCell') {
+        const pRows = inst.rows[scenario].coolCell || [], pi = pRows.findIndex((r, i) => r && num(r.lenFt) > 0 && num(r.htFt) > 0 && prop.rows.coolCell[i] && prop.rows.coolCell[i].vel > 0);
+        if (pi >= 0) {
+          const pr = pRows[pi], vP = prop.rows.coolCell[pi].vel, exRows = (inst.rows.existing.coolCell || []).filter(r => r && num(r.lenFt) > 0 && num(r.htFt) > 0);
+          const differs = (H != null && exRows.some(r => Math.abs(num(r.htFt) - H) > 1e-9)) || (pr.name && !exRows.some(r => r.name === pr.name));   // not the cells in the barn: another height, or a model that is not in it
+          if (differs) sizes.forEach(u => { const unit = vP * u.len * u.h, n = Math.ceil(need / unit - 1e-9), text = 'replace them with ' + pl(n, 'cool cell') + ', each ' + tr(u.len) + ' ft wide × ' + tr(u.h) + ' ft tall' + (pr.name ? ' (' + pr.name + ')' : ''); if (!padReplace.some(o => o.text === text)) padReplace.push({ replace: true, n, unit, text }); });
+        }
+      }
       if (!covered) {
         const groups = {}, order = [];   // the options come out group by group: its sizes, then its mix
         sizes.forEach(u => { const g = u.group || ''; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(u); });
@@ -4743,12 +4755,14 @@ const VENT = (function () {
           // keep and add: one existing piece = one option, said inline ("keep the 4 AP ACI-2-4000 and add 1 inlet (AP ACI-2-4000)"); else a heading over the group's choices
           const haves = replace ? pcs.map(u => u.haveText(u.haveN)).filter((t, i, a) => a.indexOf(t) === i) : [], keep = 'keep the ' + (haves.length === 1 ? haves[0] : 'existing') + ' and add', inline = replace && !pcs[0].listed && sizes.length === 1;
           if (replace && !inline) head = { head: keep };
+          if (padReplace.length && pcs[0].listed && shared) head = { head: 'keep the existing pads and add' + (pcs[0].tail ? ' ' + pcs[0].tail : '') };
           pcs.forEach(u => { const n = Math.ceil(gap / u.unit - 1e-9); options.push(Object.assign({ n, unit: u.unit, text: (inline ? keep + ' ' : '') + words([{ u, n }], shared) }, head)); });
           const m = MIXABLE[k] && pcs.length > 1 ? bestMix(pcs, gap) : null;
           if (m) options.push(Object.assign({ mix: true, n: m.n, total: m.total, parts: m.parts.map(p => ({ n: p.n, unit: p.u.unit })), text: words(m.parts, shared) }, head));
         });
       }
       if (replace) options.push({ replace: true, text: replace });
+      padReplace.forEach(o => options.push(o));
       out[k] = { have, need, covered, list: sizes.some(u => u.listed) || !!replace, options };
     });
     return out;
