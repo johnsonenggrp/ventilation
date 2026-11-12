@@ -4465,6 +4465,9 @@ const VENT = (function () {
   // Pad height (ft) for the "To add" cool cell options: a number above 0 and up to 20. Anything else is ignored (the existing pads' own heights are used).
   const PAD_H_MAX = 20;
   const okPadH = v => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && isFinite(+v) && +v > 0 && +v <= PAD_H_MAX;
+  // Pad width (ft) for the "To add" cool cell options: how wide ONE new cell is (36 ft cells), above 0 and up to 500. Anything else is ignored (the lengths in the existing table are used).
+  const PAD_W_MAX = 500;
+  const okPadW = v => (typeof v === 'number' || (typeof v === 'string' && v.trim() !== '')) && isFinite(+v) && +v > 0 && +v <= PAD_W_MAX;
   // The filter bank is bought in frame units 3 filters high: 3H x 2W (6 filters) or 3H x 1W (3 filters). The "To add" filter bank options count those units.
   const FILTER_UNIT_HIGH = 3, FILTER_UNIT_WIDE = [2, 1];
 
@@ -4657,7 +4660,8 @@ const VENT = (function () {
        have = the EXISTING rows rated at the PROPOSED pressures (that is how they will run after the remodel);
        each distinct existing size gives one option: n = ceil((need - have) / the capacity of one piece). Soffit is a run, so its n is feet.
      Cool cells: opts.padHeightFt (see okPadH) makes the new pads that many feet tall, with the existing lengths and the existing pad model's velocity; without it they are the
-     existing pads' own heights.
+     existing pads' own heights. opts.padWidthFt (see okPadW) makes every new cell that many feet wide (36 ft cells) instead of the length of each row in the existing table: a barn whose
+     existing pads are ONE row of 144 ft would otherwise be told to add "2 cool cells, each 144 ft wide", because the line can only count in the pieces it was given.
      Filter bank: the pieces are frame units, 3H x 2W (6 filters) and 3H x 1W (3 filters) of each existing filter size (FILTER_UNIT_HIGH / FILTER_UNIT_WIDE), not single filters.
      Cool cells, the filter bank and shutters are shown as lists (the answer says `list: true`): one choice per row. When every piece of a group has the same tail, that is the options' `head`, said once
      for the choices under it (the filter size and model: "24×24 in. VariCelVXLRC MERV-15 filters"; the pad model: "Aerotech CT cool cells"; shutters have none), and their text is only the choice
@@ -4666,28 +4670,35 @@ const VENT = (function () {
      Cool cells, the filter bank and shutters also get one more option when there are two sizes to mix (the two pad lengths; the 2W and 1W units of one filter size; the two shutter sizes): the mix of the two that
      covers the need with the least over-build, at least one of each (so neither size is left over: take any one piece away and it no longer covers), fewest pieces on a tie.
      It is { mix: true, n: total pieces, total: CFM, parts: [{ n, unit }, { n, unit }], text }. It is left out when one piece of the larger size alone covers the need.
+     Keep and add, or replace (inlets, inlet filters, the filter bank, soffit): the options above are more of what is already in the barn, on top of keeping it. When the proposed table lists a model
+     that is NOT in the barn (4 AP inlets in the barn, 6 DoubleL in the table) that reads like a contradiction, so the line says what it is: the add options start "keep the 4 AP ACI-2-4000 and add"
+     (inline when there is one option, as a heading over the choices when there are several) and one more option, { replace: true, text }, is the proposed table's own rows ("replace them with
+     6 inlets (DoubleL ...), as in the table above"), so it can never disagree with the table; when the table is itself short of what its own check needs (the proposed fans want more inlet flow
+     than the table's inlets give) it adds "(13,182 CFM, short of the 28,836 CFM needed)". The answer then says `list: true`. Pads and shutters do not get it.
      A category is left out when the proposed side does not use it or the existing side has no pieces of it. Display only: nothing here changes a row or a total. */
   function toAdd(config, inst, limits, scenario, opts) {
     scenario = scenario || 'proposed';
     const H = opts && okPadH(opts.padHeightFt) ? +opts.padHeightFt : null;   // null = each existing pad's own height
+    const W = opts && okPadW(opts.padWidthFt) ? +opts.padWidthFt : null;    // null = the length of each row in the existing table
     const q = scenarioInputs(config, inst, scenario), prop = computeSection(q.b, q.sp, inst.rows[scenario], limits), ex = computeSection(q.b, q.sp, inst.rows.existing, limits), out = {};
     const tr = x => String(+(+x).toFixed(2)), nm = s => String(s || '').replace(/_/g, ' '), who = r => [r.mfg, r.model].filter(Boolean).join(' '), pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');   // the count is always a plain noun phrase ("6 cool cells, each 36 ft wide × 5 ft tall"), never "6 × 36 ft", which reads as 6 ft by 36 ft
     // a piece: key (same key = same size), unit (CFM of ONE piece), bare(n) (the count and the size), tail (what is shared by every piece of the same kind, shown in brackets), and for the
+    // categories that can be replaced: haveN (how many of it the row has: a count, feet of soffit), haveText(n) ("4 AP ACI-2-4000") and plain(n) (how the table words n of it), and for the
     // categories that can be mixed: group (only pieces of one group are mixed; the options are listed group by group) and per (filters in one piece); listed: drawn as a list, where a tail shared by the whole group is the options' head, not a bracket
     const piece = (key, unit, bare, tail, extra) => Object.assign({ key, unit, bare, tail: tail || '' }, extra);
     const UNIT = {   // one existing row -> null (not a piece of anything) or a list of pieces
-      inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? [piece([r.mfg, r.model].join('|'), rr.cfm, n => pl(n, 'inlet'), who(r))] : null,
-      inletFilter: (r, rr) => num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0 ? [piece([r.mfg, r.type, num(r.w), num(r.h)].join('|'), rr.cfmEach, n => pl(n, 'inlet filter') + ', each ' + tr(r.w) + '×' + tr(r.h) + ' in.', nm(r.type))] : null,
-      coolCell: (r, rr) => { if (!(num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0)) return null; const h = H != null ? H : num(r.htFt); return [piece([r.mfg, r.name, num(r.lenFt), h].join('|'), rr.vel * num(r.lenFt) * h, n => pl(n, 'cool cell') + ', each ' + tr(r.lenFt) + ' ft wide × ' + tr(h) + ' ft tall', r.name ? r.name + ' cool cells' : '', { group: String(h), listed: true })]; },
+      inlet: (r, rr) => num(r.qty) > 0 && rr.cfm > 0 ? [piece([r.mfg, r.model].join('|'), rr.cfm, n => pl(n, 'inlet'), who(r), { haveN: num(r.qty), haveText: n => n + ' ' + who(r), plain: n => pl(n, 'inlet') + ' (' + who(r) + ')' })] : null,
+      inletFilter: (r, rr) => num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0 ? [piece([r.mfg, r.type, num(r.w), num(r.h)].join('|'), rr.cfmEach, n => pl(n, 'inlet filter') + ', each ' + tr(r.w) + '×' + tr(r.h) + ' in.', nm(r.type), { haveN: num(r.qty), haveText: n => n + ' ' + nm(r.type) + ' (' + tr(r.w) + '×' + tr(r.h) + ' in.)', plain: n => pl(n, 'inlet filter') + ', each ' + tr(r.w) + '×' + tr(r.h) + ' in. (' + nm(r.type) + ')' })] : null,
+      coolCell: (r, rr) => { if (!(num(r.lenFt) > 0 && num(r.htFt) > 0 && rr.cap > 0)) return null; const h = H != null ? H : num(r.htFt), len = W != null ? W : num(r.lenFt); return [piece([r.mfg, r.name, len, h].join('|'), rr.vel * len * h, n => pl(n, 'cool cell') + ', each ' + tr(len) + ' ft wide × ' + tr(h) + ' ft tall', r.name ? r.name + ' cool cells' : '', { group: String(h), listed: true })]; },
       filter: (r, rr) => {
         if (!(num(r.qty) > 0 && num(r.w) > 0 && num(r.h) > 0 && rr.cfmEach > 0)) return null;
         const size = [r.mfg, r.type, num(r.w), num(r.h)].join('|');
-        return FILTER_UNIT_WIDE.map(wide => piece(size + '|' + wide, rr.cfmEach * FILTER_UNIT_HIGH * wide, n => pl(n, 'unit') + ' of ' + FILTER_UNIT_HIGH + 'H × ' + wide + 'W', tr(r.w) + '×' + tr(r.h) + ' in. ' + nm(r.type) + ' filters', { group: size, per: FILTER_UNIT_HIGH * wide, listed: true }));
+        return FILTER_UNIT_WIDE.map(wide => piece(size + '|' + wide, rr.cfmEach * FILTER_UNIT_HIGH * wide, n => pl(n, 'unit') + ' of ' + FILTER_UNIT_HIGH + 'H × ' + wide + 'W', tr(r.w) + '×' + tr(r.h) + ' in. ' + nm(r.type) + ' filters', { group: size, per: FILTER_UNIT_HIGH * wide, listed: true, haveN: num(r.qty), haveText: n => n + ' ' + nm(r.type) + ' filters (' + tr(r.w) + '×' + tr(r.h) + ' in.)', plain: n => n + ' ' + nm(r.type) + ' filters (' + tr(r.w) + '×' + tr(r.h) + ' in.)' }));
       },
-      soffit: (r, rr) => num(r.lenFt) > 0 && rr.total > 0 ? [piece([r.type, num(r.widthIn)].join('|'), rr.total / num(r.lenFt), n => n + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit')] : null,
+      soffit: (r, rr) => num(r.lenFt) > 0 && rr.total > 0 ? [piece([r.type, num(r.widthIn)].join('|'), rr.total / num(r.lenFt), n => n + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit', '', { haveN: num(r.lenFt), haveText: n => tr(n) + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit', plain: n => tr(n) + ' ft of ' + tr(r.widthIn) + ' in. ' + nm(r.type) + ' soffit' })] : null,
       shutter: (r, rr) => num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0 && rr.total > 0 ? [piece([num(r.lenFt), num(r.widthIn)].join('|'), rr.total / num(r.number), n => pl(n, 'shutter') + ', each ' + tr(r.lenFt) + ' ft long × ' + tr(r.widthIn) + ' in. wide', '', { group: 'all', listed: true })] : null   // any two shutter sizes can be mixed (no height to keep the same)
     };
-    const MIXABLE = { coolCell: true, filter: true, shutter: true };
+    const MIXABLE = { coolCell: true, filter: true, shutter: true }, REPLACEABLE = { inlet: true, inletFilter: true, filter: true, soffit: true };
     // the words for one option: one part = a single size, two parts = the two sizes joined with "plus". The bracket holds the filter count (frames only) and, when it is not said once above the
     // choices (shared: every piece of the group has the same tail), what the piece is (pad model, filter size).
     const bracket = (parts, tail) => { const f = parts.reduce((s, p) => s + (p.u.per || 0) * p.n, 0), inner = [f ? f + ' filters' : '', tail].filter(Boolean).join(', '); return inner ? ' (' + inner + ')' : ''; };
@@ -4714,20 +4725,31 @@ const VENT = (function () {
     Object.keys(UNIT).forEach(k => {
       const c = prop.checks[k]; if (!(c && prop.totals[k] > 0)) return;      // the proposed side has none of this
       const seen = {}, sizes = [];
-      (inst.rows.existing[k] || []).forEach((r, i) => { const rr = r && ex.rows[k][i], us = rr ? UNIT[k](r, rr) : null; (us || []).forEach(u => { if (!seen[u.key]) { seen[u.key] = true; sizes.push(u); } }); });
+      (inst.rows.existing[k] || []).forEach((r, i) => { const rr = r && ex.rows[k][i], us = rr ? UNIT[k](r, rr) : null; (us || []).forEach(u => { if (!seen[u.key]) { seen[u.key] = u; sizes.push(u); } else if (u.haveN) seen[u.key].haveN += u.haveN; }); });
       const have = ex.totals[k]; if (!sizes.length || !(have > 0)) return;
       const need = Math.max(prop.totals[k], c.ref > 0 ? c.ref : 0), gap = need - have, covered = gap <= need * 1e-9, options = [];
+      let replace = null;   // the proposed table's own rows, when they list a model that is not in the barn
+      if (!covered && REPLACEABLE[k]) {
+        const mine = {}, pseen = {}, theirs = [];
+        sizes.forEach(u => { mine[u.group || u.key] = true; });
+        (inst.rows[scenario][k] || []).forEach((r, i) => { const rr = r && prop.rows[k][i], us = rr ? UNIT[k](r, rr) : null, u = us && us[0]; if (!u) return; const g = u.group || u.key; if (!pseen[g]) { pseen[g] = u; theirs.push(u); } else pseen[g].haveN += u.haveN; });
+        if (theirs.some(u => !mine[u.group || u.key])) replace = 'replace them with ' + theirs.map(u => u.plain(u.haveN)).join(' plus ') + ', as in the table above' + (prop.totals[k] < need * (1 - 1e-9) ? ' (' + fmt(prop.totals[k]) + ' CFM, short of the ' + fmt(need) + ' CFM needed)' : '');   // when the table itself is short of what its own check needs, say so
+      }
       if (!covered) {
         const groups = {}, order = [];   // the options come out group by group: its sizes, then its mix
         sizes.forEach(u => { const g = u.group || ''; if (!groups[g]) { groups[g] = []; order.push(g); } groups[g].push(u); });
         order.forEach(g => {
-          const pcs = groups[g], shared = pcs.every(u => u.tail === pcs[0].tail), head = pcs[0].listed && shared && pcs[0].tail ? { head: pcs[0].tail } : {};
-          pcs.forEach(u => { const n = Math.ceil(gap / u.unit - 1e-9); options.push(Object.assign({ n, unit: u.unit, text: words([{ u, n }], shared) }, head)); });
+          const pcs = groups[g], shared = pcs.every(u => u.tail === pcs[0].tail); let head = pcs[0].listed && shared && pcs[0].tail ? { head: pcs[0].tail } : {};
+          // keep and add: one existing piece = one option, said inline ("keep the 4 AP ACI-2-4000 and add 1 inlet (AP ACI-2-4000)"); else a heading over the group's choices
+          const haves = replace ? pcs.map(u => u.haveText(u.haveN)).filter((t, i, a) => a.indexOf(t) === i) : [], keep = 'keep the ' + (haves.length === 1 ? haves[0] : 'existing') + ' and add', inline = replace && !pcs[0].listed && sizes.length === 1;
+          if (replace && !inline) head = { head: keep };
+          pcs.forEach(u => { const n = Math.ceil(gap / u.unit - 1e-9); options.push(Object.assign({ n, unit: u.unit, text: (inline ? keep + ' ' : '') + words([{ u, n }], shared) }, head)); });
           const m = MIXABLE[k] && pcs.length > 1 ? bestMix(pcs, gap) : null;
           if (m) options.push(Object.assign({ mix: true, n: m.n, total: m.total, parts: m.parts.map(p => ({ n: p.n, unit: p.u.unit })), text: words(m.parts, shared) }, head));
         });
       }
-      out[k] = { have, need, covered, list: sizes.some(u => u.listed), options };
+      if (replace) options.push({ replace: true, text: replace });
+      out[k] = { have, need, covered, list: sizes.some(u => u.listed) || !!replace, options };
     });
     return out;
   }
@@ -5480,6 +5502,7 @@ const VENT = (function () {
     const rawOC = inst => inst.openingCoeff != null ? inst.openingCoeff : (STATE.openingCoeff != null ? STATE.openingCoeff : OC_DEFAULT);   // undefined farm-wide = an older save: shows (and uses) the default without changing the save
     const scnLabel = { existing: 'Existing', proposed: 'Proposed Remodel' }; if (opts.labels) Object.keys(opts.labels).forEach(k => scnLabel[k] = opts.labels[k]);
     const LSKEY = 'cf_vent_config_v3';
+    const padWidthChoice = new WeakMap();   // barn -> the cell width typed in the "To add" box (this session only, like the height)
     const padHeightChoice = new WeakMap();   // barn -> the pad height typed in the "To add" box (this session only; it is a what-if, never saved with the site)
     root.classList.add('vent-app', 'layout-' + layout);
 
@@ -5841,13 +5864,19 @@ const VENT = (function () {
     // itself is never repainted, so typing in it is not interrupted. A value outside 0 to 20 is flagged and not used (the way the static pressure boxes refuse values).
     function proposedPadHeight(inst, sec) { const row = ((inst.rows[sec] || {}).coolCell || []).find(r => r && num(r.htFt) > 0); return row ? num(row.htFt) : null; }   // function declarations: the first render runs before this point of the setup
     function padHeightFor(inst, sec) { const c = padHeightChoice.get(inst); return c != null ? c : proposedPadHeight(inst, sec); }
+    function padWidthFor(inst) { const c = padWidthChoice.get(inst); return c != null ? c : null; }   // blank = the lengths in the existing table
     function buildPadHeightBox(inst, sec) {
-      const w = $('label', 'ca-ctl'), i = $('input'), stored = () => { const c = padHeightChoice.get(inst); return c != null ? String(c) : ''; };
+      const w = $('div', 'ca-ctl'), i = $('input'), stored = () => { const c = padHeightChoice.get(inst); return c != null ? String(c) : ''; };
       i.type = 'number'; i.min = '1'; i.max = String(PAD_H_MAX); i.step = '0.5'; i.value = stored(); i.title = 'How tall the new pads are, in feet. Leave blank to use the height in the proposed cool cell row.';
       i.addEventListener('input', () => { if (i.value === '') { padHeightChoice.delete(inst); i.classList.remove('bad-in'); schedule(); } else if (okPadH(i.value)) { padHeightChoice.set(inst, +i.value); i.classList.remove('bad-in'); schedule(); } else i.classList.add('bad-in'); });
       i.addEventListener('change', () => { if (!(i.value === '' || okPadH(i.value))) { i.value = stored(); i.classList.remove('bad-in'); } });
-      w.appendChild($('span', null, 'New pads are')); w.appendChild(i); w.appendChild($('span', null, 'ft tall')); w.appendChild($('span', 'ca-hint', '(blank = the height in the proposed row)'));
-      RES[sec + '.addH'] = i; return w;
+      // and how wide one new cell is (36 ft cells): blank = the length of each row in the existing table
+      const j = $('input'), storedW = () => { const c = padWidthChoice.get(inst); return c != null ? String(c) : ''; };
+      j.type = 'number'; j.min = '1'; j.max = String(PAD_W_MAX); j.step = '0.5'; j.value = storedW(); j.title = 'How wide one new cool cell is, in feet (36 ft cells). Leave blank to count in the lengths in the existing cool cell table.';
+      j.addEventListener('input', () => { if (j.value === '') { padWidthChoice.delete(inst); j.classList.remove('bad-in'); schedule(); } else if (okPadW(j.value)) { padWidthChoice.set(inst, +j.value); j.classList.remove('bad-in'); schedule(); } else j.classList.add('bad-in'); });
+      j.addEventListener('change', () => { if (!(j.value === '' || okPadW(j.value))) { j.value = storedW(); j.classList.remove('bad-in'); } });
+      w.appendChild($('span', null, 'New pads are')); w.appendChild(i); w.appendChild($('span', null, 'ft tall and')); w.appendChild(j); w.appendChild($('span', null, 'ft wide')); w.appendChild($('span', 'ca-hint', '(blank: tall as in the proposed row, wide as in the existing table)'));
+      RES[sec + '.addH'] = i; RES[sec + '.addW'] = j; return w;
     }
     function paintAdd(sec, ta, inst) {
       CAT_ORDER.forEach(ck => {
@@ -5863,7 +5892,10 @@ const VENT = (function () {
         }
         else { body.appendChild($('span', 'ca-label', 'To add')); r.options.forEach((o, i) => { if (i) body.appendChild($('span', 'ca-or', 'or')); body.appendChild($('b', 'ca-opt', o.text)); }); }
         body.appendChild($('span', 'ca-sub', 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
-        if (ck === 'coolCell') { const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; } }
+        if (ck === 'coolCell') {
+          const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; }
+          const wb = RES[sec + '.addW']; if (wb) { const ls = ((inst.rows.existing || {}).coolCell || []).map(r => r && num(r.lenFt)).filter(x => x > 0).filter((x, i, a) => a.indexOf(x) === i); wb.placeholder = ls.length === 1 ? String(+ls[0].toFixed(2)) : ''; }   // the one length that is used when blank
+        }
       });
     }
     // the notes under a fan / inlet row: which curve is behind the numbers
@@ -5898,7 +5930,7 @@ const VENT = (function () {
         rangeSub(sec + '.airExchSec.sub', res.ranges.airExch, limits.airExchangeSec); rangeSub(sec + '.perHeadMax.sub', res.ranges.perHeadMax, limits.flowMax); rangeSub(sec + '.perHeadMin.sub', res.ranges.perHeadMin, limits.flowMin); rangeSub(sec + '.airSpeedMax.sub', res.ranges.airSpeed, limits.airSpeed);
         Object.keys(res.checks).forEach(k => { const chip = RES[sec + '.chk.' + k]; if (!chip) return; const c = res.checks[k]; const st = chip.querySelector('.chip-status'); const present = c.cap > 0, judged = present && c.ref > 0; st.textContent = !present ? 'none' : (c.ref > 0 ? (c.ok ? 'Sufficient' : 'Insufficient') : '—'); chip.classList.toggle('ok', judged && c.ok); chip.classList.toggle('bad', judged && !c.ok); chip.classList.toggle('na', !judged); });
       });
-      if (scenarios.indexOf('existing') >= 0) scenarios.filter(sec => sec !== 'existing').forEach(sec => paintAdd(sec, toAdd(STATE, inst, limits, sec, { padHeightFt: padHeightFor(inst, sec) }), inst));
+      if (scenarios.indexOf('existing') >= 0) scenarios.filter(sec => sec !== 'existing').forEach(sec => paintAdd(sec, toAdd(STATE, inst, limits, sec, { padHeightFt: padHeightFor(inst, sec), padWidthFt: padWidthFor(inst) }), inst));
       if (RES.__status && dualStatus) {
         // one verdict per scenario shown: Existing is judged as installed, Proposed against the design targets
         const segs = scenarios.map(sec => {
