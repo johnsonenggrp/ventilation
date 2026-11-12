@@ -227,9 +227,9 @@ em{font-style:italic;color:var(--muted)}
 .ca-list{flex-basis:100%;display:grid;grid-template-columns:auto 1fr;gap:3px 10px;align-items:baseline}
 .ca-list .ca-or{text-align:right}
 .ca-body{display:contents}
-.ca-ctl{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px;font-size:12px;color:var(--ink)}
-.ca-ctl input{width:70px;padding:3px 6px;border:1px solid var(--in-line);background:var(--in-bg);border-radius:6px;font:inherit;font-family:var(--mono)}
-.ca-ctl input.bad-in{border-color:var(--bad);background:var(--bad-bg)}
+.ca-ctl,.ca-end{flex-basis:100%;display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:2px;font-size:12px;color:var(--ink)}
+.ca-ctl input,.ca-end input{width:70px;padding:3px 6px;border:1px solid var(--in-line);background:var(--in-bg);border-radius:6px;font:inherit;font-family:var(--mono)}
+.ca-ctl input.bad-in,.ca-end input.bad-in{border-color:var(--bad);background:var(--bad-bg)}
 .ca-hint{font-size:11px;font-style:italic;color:var(--muted)}
 .cat-total{display:flex;flex-direction:column}
 .ct-label{font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;letter-spacing:.3px}
@@ -4678,11 +4678,16 @@ const VENT = (function () {
      Cool cells get their own replace choice, because the proposed table is one long run, not countable cells: when the new cells are not the cells in the barn (a different height than the existing
      pads, or a pad model that is not in the barn) the add choices become "keep the existing pads and add ..." and one more choice per cell size says how many of the new cells the whole
      need takes if the existing pads come out: "replace them with 9 cool cells, each 36 ft wide × 5 ft tall (Aerotech CT)" (all of the need, counted at the PROPOSED pad model's velocity).
+     End pad (opts.padEndFt = { len, ht }): in a gestation or breeding barn the cool cells change on the two sides only; the one on the end wall has no room to grow and stays. With it given the
+     line works out the SIDES: the end pad's share of the need (the proposed pad model's velocity x len x ht) comes off the need, the existing row of that length and height (if there is one) comes
+     off what the barn has, and every count is for ONE side (the sides are taken as equal): "3 cool cells, each 45 ft wide × 5 ft tall, on each side". The replace choice is then always
+     offered ("replace the side pads with ..."), and the answer says `end: { len, ht, cfm }` with have / need being the sides' own. The proposed cool cell rows are taken to be the whole barn, end pad included.
      A category is left out when the proposed side does not use it or the existing side has no pieces of it. Display only: nothing here changes a row or a total. */
   function toAdd(config, inst, limits, scenario, opts) {
     scenario = scenario || 'proposed';
     const H = opts && okPadH(opts.padHeightFt) ? +opts.padHeightFt : null;   // null = each existing pad's own height
     const W = opts && okPadW(opts.padWidthFt) ? +opts.padWidthFt : null;    // null = the length of each row in the existing table
+    const E = opts && opts.padEndFt && okPadW(opts.padEndFt.len) && okPadH(opts.padEndFt.ht) ? { len: +opts.padEndFt.len, ht: +opts.padEndFt.ht } : null;   // an end pad that stays as it is: only the sides change
     const q = scenarioInputs(config, inst, scenario), prop = computeSection(q.b, q.sp, inst.rows[scenario], limits), ex = computeSection(q.b, q.sp, inst.rows.existing, limits), out = {};
     const tr = x => String(+(+x).toFixed(2)), nm = s => String(s || '').replace(/_/g, ' '), who = r => [r.mfg, r.model].filter(Boolean).join(' '), pl = (n, w) => n + ' ' + w + (n === 1 ? '' : 's');   // the count is always a plain noun phrase ("6 cool cells, each 36 ft wide × 5 ft tall"), never "6 × 36 ft", which reads as 6 ft by 36 ft
     // a piece: key (same key = same size), unit (CFM of ONE piece), bare(n) (the count and the size), tail (what is shared by every piece of the same kind, shown in brackets), and for the
@@ -4729,8 +4734,16 @@ const VENT = (function () {
       const c = prop.checks[k]; if (!(c && prop.totals[k] > 0)) return;      // the proposed side has none of this
       const seen = {}, sizes = [];
       (inst.rows.existing[k] || []).forEach((r, i) => { const rr = r && ex.rows[k][i], us = rr ? UNIT[k](r, rr) : null; (us || []).forEach(u => { if (!seen[u.key]) { seen[u.key] = u; sizes.push(u); } else if (u.haveN) seen[u.key].haveN += u.haveN; }); });
-      const have = ex.totals[k]; if (!sizes.length || !(have > 0)) return;
-      const need = Math.max(prop.totals[k], c.ref > 0 ? c.ref : 0), gap = need - have, covered = gap <= need * 1e-9, options = [];
+      let have = ex.totals[k]; if (!sizes.length || !(have > 0)) return;
+      let need = Math.max(prop.totals[k], c.ref > 0 ? c.ref : 0), sides = null;
+      if (k === 'coolCell' && E) {   // the end pad stays: its share of the need comes off the need, and its row (the one of that length and height) comes off what the barn has
+        const eRows = inst.rows[scenario].coolCell || [], ei = eRows.findIndex((r, i) => r && num(r.lenFt) > 0 && num(r.htFt) > 0 && prop.rows.coolCell[i] && prop.rows.coolCell[i].vel > 0);
+        if (ei >= 0) {
+          const eNeed = prop.rows.coolCell[ei].vel * E.len * E.ht, mi = (inst.rows.existing.coolCell || []).findIndex((r, i) => r && Math.abs(num(r.lenFt) - E.len) < 1e-9 && Math.abs(num(r.htFt) - E.ht) < 1e-9 && ex.rows.coolCell[i] && ex.rows.coolCell[i].cap > 0);
+          sides = { len: E.len, ht: E.ht, cfm: eNeed }; if (mi >= 0) have -= ex.rows.coolCell[mi].cap; need -= eNeed;
+        }
+      }
+      const div = sides ? 2 : 1, gap = need - have, covered = gap <= need * 1e-9 || (!!sides && need <= 0), options = [];   // with an end pad every count is for one of the two sides
       let replace = null;   // the proposed table's own rows, when they list a model that is not in the barn
       if (!covered && REPLACEABLE[k]) {
         const mine = {}, pseen = {}, theirs = [];
@@ -4744,7 +4757,7 @@ const VENT = (function () {
         if (pi >= 0) {
           const pr = pRows[pi], vP = prop.rows.coolCell[pi].vel, exRows = (inst.rows.existing.coolCell || []).filter(r => r && num(r.lenFt) > 0 && num(r.htFt) > 0);
           const differs = (H != null && exRows.some(r => Math.abs(num(r.htFt) - H) > 1e-9)) || (pr.name && !exRows.some(r => r.name === pr.name));   // not the cells in the barn: another height, or a model that is not in it
-          if (differs) sizes.forEach(u => { const unit = vP * u.len * u.h, n = Math.ceil(need / unit - 1e-9), text = 'replace them with ' + pl(n, 'cool cell') + ', each ' + tr(u.len) + ' ft wide × ' + tr(u.h) + ' ft tall' + (pr.name ? ' (' + pr.name + ')' : ''); if (!padReplace.some(o => o.text === text)) padReplace.push({ replace: true, n, unit, text }); });
+          if (differs || sides) sizes.forEach(u => { const unit = vP * u.len * u.h, n = Math.ceil(need / div / unit - 1e-9), text = (sides ? 'replace the side pads with ' : 'replace them with ') + pl(n, 'cool cell') + ', each ' + tr(u.len) + ' ft wide × ' + tr(u.h) + ' ft tall' + (pr.name ? ' (' + pr.name + ')' : '') + (sides ? ', on each side' : ''); if (!padReplace.some(o => o.text === text)) padReplace.push({ replace: true, n, unit, text }); });
         }
       }
       if (!covered) {
@@ -4756,14 +4769,14 @@ const VENT = (function () {
           const haves = replace ? pcs.map(u => u.haveText(u.haveN)).filter((t, i, a) => a.indexOf(t) === i) : [], keep = 'keep the ' + (haves.length === 1 ? haves[0] : 'existing') + ' and add', inline = replace && !pcs[0].listed && sizes.length === 1;
           if (replace && !inline) head = { head: keep };
           if (padReplace.length && pcs[0].listed && shared) head = { head: 'keep the existing pads and add' + (pcs[0].tail ? ' ' + pcs[0].tail : '') };
-          pcs.forEach(u => { const n = Math.ceil(gap / u.unit - 1e-9); options.push(Object.assign({ n, unit: u.unit, text: (inline ? keep + ' ' : '') + words([{ u, n }], shared) }, head)); });
-          const m = MIXABLE[k] && pcs.length > 1 ? bestMix(pcs, gap) : null;
-          if (m) options.push(Object.assign({ mix: true, n: m.n, total: m.total, parts: m.parts.map(p => ({ n: p.n, unit: p.u.unit })), text: words(m.parts, shared) }, head));
+          pcs.forEach(u => { const n = Math.ceil(gap / div / u.unit - 1e-9); options.push(Object.assign({ n, unit: u.unit, text: (inline ? keep + ' ' : '') + words([{ u, n }], shared) + (sides ? ', on each side' : '') }, head)); });
+          const m = MIXABLE[k] && pcs.length > 1 ? bestMix(pcs, gap / div) : null;
+          if (m) options.push(Object.assign({ mix: true, n: m.n, total: m.total, parts: m.parts.map(p => ({ n: p.n, unit: p.u.unit })), text: words(m.parts, shared) + (sides ? ', on each side' : '') }, head));
         });
       }
       if (replace) options.push({ replace: true, text: replace });
       padReplace.forEach(o => options.push(o));
-      out[k] = { have, need, covered, list: sizes.some(u => u.listed) || !!replace, options };
+      out[k] = Object.assign({ have, need, covered, list: sizes.some(u => u.listed) || !!replace, options }, sides ? { end: sides } : {});
     });
     return out;
   }
@@ -5516,6 +5529,7 @@ const VENT = (function () {
     const rawOC = inst => inst.openingCoeff != null ? inst.openingCoeff : (STATE.openingCoeff != null ? STATE.openingCoeff : OC_DEFAULT);   // undefined farm-wide = an older save: shows (and uses) the default without changing the save
     const scnLabel = { existing: 'Existing', proposed: 'Proposed Remodel' }; if (opts.labels) Object.keys(opts.labels).forEach(k => scnLabel[k] = opts.labels[k]);
     const LSKEY = 'cf_vent_config_v3';
+    const padEndChoice = new WeakMap();   // barn -> { len, ht } typed in the end pad boxes (this session only, like the height and width)
     const padWidthChoice = new WeakMap();   // barn -> the cell width typed in the "To add" box (this session only, like the height)
     const padHeightChoice = new WeakMap();   // barn -> the pad height typed in the "To add" box (this session only; it is a what-if, never saved with the site)
     root.classList.add('vent-app', 'layout-' + layout);
@@ -5845,7 +5859,7 @@ const VENT = (function () {
       else if (ck === 'coolCell') { foot.appendChild(totalSlot(sec, 'coolCellArea', 'Total Area', 'SF')); foot.appendChild(totalSlot(sec, 'coolCell', 'Total Capacity', 'CFM')); }
       else foot.appendChild(totalSlot(sec, cfg.group, 'Total Capacity', 'CFM'));
       block.appendChild(foot);
-      if (ck !== 'fan' && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'), body = $('div', 'ca-body'); add.hidden = true; add.appendChild(body); RES[sec + '.add.' + ck] = add; RES[sec + '.addbody.' + ck] = body; block.appendChild(add); if (ck === 'coolCell') add.appendChild(buildPadHeightBox(inst, sec)); }   // "To add": filled in by paintAdd
+      if (ck !== 'fan' && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'), body = $('div', 'ca-body'); add.hidden = true; add.appendChild(body); RES[sec + '.add.' + ck] = add; RES[sec + '.addbody.' + ck] = body; block.appendChild(add); if (ck === 'coolCell') { add.appendChild(buildPadHeightBox(inst, sec)); add.appendChild(buildPadEndBox(inst, sec)); } }   // "To add": filled in by paintAdd
       return block;
     }
     function totalSlot(sec, key, label, unit) { const d = $('div', 'cat-total'); d.appendChild($('span', 'ct-label', label)); const v = $('span', 'ct-val'); const line = $('div', 'ct-line'); line.appendChild(v); line.appendChild($('span', 'ct-unit', unit)); d.appendChild(line); RES[sec + '.tot.' + key] = v; return d; }
@@ -5879,6 +5893,19 @@ const VENT = (function () {
     function proposedPadHeight(inst, sec) { const row = ((inst.rows[sec] || {}).coolCell || []).find(r => r && num(r.htFt) > 0); return row ? num(row.htFt) : null; }   // function declarations: the first render runs before this point of the setup
     function padHeightFor(inst, sec) { const c = padHeightChoice.get(inst); return c != null ? c : proposedPadHeight(inst, sec); }
     function padWidthFor(inst) { const c = padWidthChoice.get(inst); return c != null ? c : null; }   // blank = the lengths in the existing table
+    function padEndFor(inst) { const c = padEndChoice.get(inst); return c && okPadW(c.len) && okPadH(c.ht) ? { len: +c.len, ht: +c.ht } : null; }   // needs both boxes; blank = no end pad, every pad can change
+    // The end pad boxes under the cool cell line: a pad on the end wall that is not changed (gestation / breeding barns change their cool cells on the sides only). Built once, never repainted.
+    function buildPadEndBox(inst, sec) {
+      const w = $('div', 'ca-end'), a = $('input'), b = $('input'), get = () => padEndChoice.get(inst) || {}, shown = key => get()[key] != null ? String(get()[key]) : '';
+      const wire = (inp, key, ok, max, title) => {
+        inp.type = 'number'; inp.min = '1'; inp.max = String(max); inp.step = '0.5'; inp.value = shown(key); inp.title = title;
+        inp.addEventListener('input', () => { const c = Object.assign({}, get()); if (inp.value === '') { delete c[key]; padEndChoice.set(inst, c); inp.classList.remove('bad-in'); schedule(); } else if (ok(inp.value)) { c[key] = +inp.value; padEndChoice.set(inst, c); inp.classList.remove('bad-in'); schedule(); } else inp.classList.add('bad-in'); });
+        inp.addEventListener('change', () => { if (!(inp.value === '' || ok(inp.value))) { inp.value = shown(key); inp.classList.remove('bad-in'); } });
+      };
+      wire(a, 'len', okPadW, PAD_W_MAX, 'How long the cool cell on the end wall is, in feet. It stays as it is; leave both boxes blank if there is none.'); wire(b, 'ht', okPadH, PAD_H_MAX, 'How tall the cool cell on the end wall is, in feet.');
+      w.appendChild($('span', null, 'End pad that stays:')); w.appendChild(a); w.appendChild($('span', null, 'ft long and')); w.appendChild(b); w.appendChild($('span', null, 'ft tall')); w.appendChild($('span', 'ca-hint', '(not changed: only the two sides are worked out, per side. The proposed rows are the whole barn, end pad included.)'));
+      RES[sec + '.addEL'] = a; RES[sec + '.addEH'] = b; return w;
+    }
     function buildPadHeightBox(inst, sec) {
       const w = $('div', 'ca-ctl'), i = $('input'), stored = () => { const c = padHeightChoice.get(inst); return c != null ? String(c) : ''; };
       i.type = 'number'; i.min = '1'; i.max = String(PAD_H_MAX); i.step = '0.5'; i.value = stored(); i.title = 'How tall the new pads are, in feet. Leave blank to use the height in the proposed cool cell row.';
@@ -5905,7 +5932,7 @@ const VENT = (function () {
           body.appendChild(list);
         }
         else { body.appendChild($('span', 'ca-label', 'To add')); r.options.forEach((o, i) => { if (i) body.appendChild($('span', 'ca-or', 'or')); body.appendChild($('b', 'ca-opt', o.text)); }); }
-        body.appendChild($('span', 'ca-sub', 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
+        body.appendChild($('span', 'ca-sub', r.end ? 'the sides have ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM they need (the ' + +r.end.len.toFixed(2) + ' ft × ' + +r.end.ht.toFixed(2) + ' ft end pad stays: ' + fmt(r.end.cfm) + ' CFM); counts are per side' : 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
         if (ck === 'coolCell') {
           const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; }
           const wb = RES[sec + '.addW']; if (wb) { const ls = ((inst.rows.existing || {}).coolCell || []).map(r => r && num(r.lenFt)).filter(x => x > 0).filter((x, i, a) => a.indexOf(x) === i); wb.placeholder = ls.length === 1 ? String(+ls[0].toFixed(2)) : ''; }   // the one length that is used when blank
@@ -5944,7 +5971,7 @@ const VENT = (function () {
         rangeSub(sec + '.airExchSec.sub', res.ranges.airExch, limits.airExchangeSec); rangeSub(sec + '.perHeadMax.sub', res.ranges.perHeadMax, limits.flowMax); rangeSub(sec + '.perHeadMin.sub', res.ranges.perHeadMin, limits.flowMin); rangeSub(sec + '.airSpeedMax.sub', res.ranges.airSpeed, limits.airSpeed);
         Object.keys(res.checks).forEach(k => { const chip = RES[sec + '.chk.' + k]; if (!chip) return; const c = res.checks[k]; const st = chip.querySelector('.chip-status'); const present = c.cap > 0, judged = present && c.ref > 0; st.textContent = !present ? 'none' : (c.ref > 0 ? (c.ok ? 'Sufficient' : 'Insufficient') : '—'); chip.classList.toggle('ok', judged && c.ok); chip.classList.toggle('bad', judged && !c.ok); chip.classList.toggle('na', !judged); });
       });
-      if (scenarios.indexOf('existing') >= 0) scenarios.filter(sec => sec !== 'existing').forEach(sec => paintAdd(sec, toAdd(STATE, inst, limits, sec, { padHeightFt: padHeightFor(inst, sec), padWidthFt: padWidthFor(inst) }), inst));
+      if (scenarios.indexOf('existing') >= 0) scenarios.filter(sec => sec !== 'existing').forEach(sec => paintAdd(sec, toAdd(STATE, inst, limits, sec, { padHeightFt: padHeightFor(inst, sec), padWidthFt: padWidthFor(inst), padEndFt: padEndFor(inst) }), inst));
       if (RES.__status && dualStatus) {
         // one verdict per scenario shown: Existing is judged as installed, Proposed against the design targets
         const segs = scenarios.map(sec => {
