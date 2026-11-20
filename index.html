@@ -457,39 +457,50 @@ table.pcond td.lcol{white-space:normal}
 
 /* the summary report: plain words and charts */
 .rh1{font-family:var(--font-heading);font-size:20px;color:var(--brand);margin:4px 0 6px}
-.rh2{font-family:var(--font-heading);font-size:15px;color:var(--brand);margin:18px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px}
-.rh3{font-family:var(--font-heading);font-size:13px;color:var(--brand-d);margin:14px 0 4px}
-.rlead{font-size:13.5px;color:#333;margin:0 0 12px;line-height:1.5}
-.rhelp{font-size:12px;color:#444;line-height:1.5}
-.rg-row{display:grid;grid-template-columns:minmax(150px,1.1fr) minmax(190px,1.5fr) 2fr;gap:6px 14px;align-items:start;padding:8px 0;border-bottom:1px solid var(--line);page-break-inside:avoid}
+.rh2{font-family:var(--font-heading);font-size:15px;color:var(--brand);margin:16px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px}
+.rh3{font-family:var(--font-heading);font-size:13px;color:var(--brand-d);margin:10px 0 3px;break-after:avoid;page-break-after:avoid}
+.rlead{font-size:13px;color:#333;margin:0 0 8px;line-height:1.45}
+.rg-row{display:grid;grid-template-columns:160px 1fr;gap:4px 14px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);page-break-inside:avoid}
 .rg-name{font-weight:700;font-size:13px;color:var(--ink)}
-.rg-st{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
-.rg-note{font-size:12px;color:#444;line-height:1.45}
-.rst{display:inline-block;font-size:11.5px;padding:2px 10px;border-radius:999px;border:1px solid}
+.rg-sides{display:flex;flex-direction:column;gap:4px}
+.rg-side{display:flex;align-items:center;gap:10px}
+.rg-side .rst{flex:0 0 226px;box-sizing:border-box}
+.rg-short{font-size:11.5px;color:#444;line-height:1.35}
+.rst{display:inline-block;font-size:11.5px;padding:2px 10px;border-radius:999px;border:1px solid;white-space:nowrap}
+.rst .gl{font-style:normal;font-weight:700}
 .rst.ok{background:var(--ok-bg);border-color:var(--ok);color:var(--ok)}
 .rst.bad{background:#fbf3e3;border-color:#e0b36a;color:var(--warn)}
 .rst.na{background:#f0f2f4;border-color:var(--line);color:var(--muted)}
-.rverd{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 6px}
-.rfind{font-size:12.5px;color:#222;margin:4px 0}
+.rverd{display:flex;gap:8px;flex-wrap:wrap;margin:4px 0 4px}
+.rcols{display:grid;gap:20px}
+.rcols.two{grid-template-columns:1fr 1fr}
+.rcols.one{grid-template-columns:1fr}
+.rcol-h{font-family:var(--font-heading);font-size:12px;font-weight:700;color:var(--brand);border-bottom:1px solid var(--line);margin-bottom:4px;padding-bottom:2px}
+.rfind{font-size:12px;color:#222;margin:4px 0}
 .rfind.ok{color:var(--ok);font-weight:700}
 .rfind.warn{color:var(--warn);font-weight:700}
-.rreasons{margin:2px 0 8px 18px;padding:0;font-size:12.5px;line-height:1.5;color:#222}
-.rmiss{font-size:11px;color:#555;font-style:italic;margin:0 0 6px}
-.rgoal{margin:0 0 8px;page-break-inside:avoid}
-.rg-l{font-size:12px;font-weight:700;color:#333;margin-bottom:1px}
-.rg-u{font-weight:400;color:var(--muted)}
-.rsvg{width:100%;height:auto;display:block;max-width:560px}
-.rsvg text{font-family:var(--font-body);font-size:10.5px;fill:#333}
-.rsvg text.rval{font-weight:700;font-size:11px}
-.rair-row{display:flex;gap:18px;flex-wrap:wrap}
-.rfig{margin:0;flex:1 1 280px;max-width:380px}
-.rfig figcaption{font-size:11.5px;color:#444;line-height:1.45}
-.rleg{font-size:11.5px;color:#444;margin:2px 0 6px}
+.rreasons{margin:2px 0 6px 16px;padding:0;font-size:12px;line-height:1.45;color:#222}
+.rmiss{font-size:11px;color:#555;font-style:italic;margin:0 0 4px}
+.rsvg{width:100%;height:auto;display:block;break-inside:avoid;page-break-inside:avoid}
+.rsvg text{font-family:var(--font-body);font-size:11px;fill:#2b3b43}
+.rsvg text.rlab{font-weight:700;font-size:12px}
+.rsvg text.rsub{font-size:10.5px;fill:#6b7785}
+.rsvg text.rtick{font-size:10.5px;fill:#444}
+.rsvg text.rval{font-weight:700;font-size:12px}
+.rsvg text.rval.ok{fill:#1a8f4c}
+.rsvg text.rval.bad{fill:#c0392b}
+.rsvg text.rval.na{fill:#6b7785}
+.rair-row{display:flex;gap:22px;flex-wrap:wrap}
+.rfig{margin:0;flex:1 1 300px;max-width:520px}
+.rfig figcaption{font-size:12px;color:#333;line-height:1.5;margin-top:6px}
+.rleg{font-size:11.5px;color:#444;margin:2px 0 4px}
 .rleg .lg-c,.rleg .lg-d{display:inline-block;width:11px;height:11px;background:#666;vertical-align:-1px;margin-right:3px}
 .rleg .lg-c{border-radius:50%}
 .rleg .lg-d{transform:rotate(45deg) scale(.8)}
 .rbarn{page-break-before:always}
+.rguide{page-break-before:always}
 .rtech{page-break-before:always}
+.rtech>.rh1,.rtech>.rlead{break-after:avoid;page-break-after:avoid}
 @media print{
   #printArea *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .rtech .pbarn:first-of-type{page-break-before:avoid}
@@ -5207,22 +5218,25 @@ const VENT = (function () {
     return notes;
   }
   /* ---- the summary report: plain words and charts instead of tables ----
-     renderReport(container, config, meta) with meta.style === 'summary' draws this (a one-page summary of every barn, then one page per barn with goal bars and part-size bars);
-     meta.style === 'full' is the same followed by the old tables as "Technical details"; no style is the old tables, exactly as before.
-     summaryModel works out everything that is said and drawn (so a test can check it without reading HTML); summaryHtml draws it. Every chart is inline SVG, no library. */
+     renderReport(container, config, meta) with meta.style === 'summary' draws this (a one-page summary of every barn, then one page per barn with goal bars and part-size bars, then a page
+     showing how the air moves); meta.style === 'full' is the same followed by the old tables as "Technical details"; no style is the old tables, exactly as before.
+     summaryModel works out everything that is said and drawn (so a test can check it without reading HTML); summaryHtml / barnSummaryHtml / guideHtml draw it. Every chart is inline SVG, no
+     library. Nothing depends on colour alone (a PDF is often printed in grey): the result marks have shapes (dot / diamond) and a tick or a cross, and a part that is too small is hatched. */
   const escH = s => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  // the boxes of the Results section that get a bar. core: always drawn (a goal from the template), the rest only when the barn was given a goal. words: what it is when it is under / over the goal.
+  // the boxes of the Results section that get a bar. core: always drawn (a goal from the template), the rest only when the barn was given a goal. words: what it is when it is under / over the goal;
+  // name / sw: the short name and short words for the at-a-glance line.
   const GOAL_DEFS = [
-    { k: 'airExch', lim: 'airExchangeSec', core: true, label: 'Time to replace the barn’s air, full ventilation', unit: 'sec', dec: 1, words: ['too short', 'too long'], val: t => t.airExchSec },
-    { k: 'perHeadMax', lim: 'flowMax', core: true, label: 'Fresh air per pig, full ventilation', unit: 'CFM per pig', dec: 0, words: ['too low', 'too high'], val: t => t.perHeadMax },
-    { k: 'perHeadMin', lim: 'flowMin', core: true, label: 'Fresh air per pig, minimum ventilation', unit: 'CFM per pig', dec: 1, words: ['too low', 'too high'], val: t => t.perHeadMin },
-    { k: 'airSpeed', lim: 'airSpeed', core: true, label: 'Air speed through the barn, full ventilation', unit: 'ft/min', dec: 0, words: ['too slow', 'too fast'], val: t => t.airSpeedMax },
-    { k: 'fanMax', lim: 'fanMax', label: 'Fan capacity, full ventilation', unit: 'CFM', dec: 0, words: ['too low', 'too high'], val: t => t.fanMax },
-    { k: 'fanMin', lim: 'fanMin', label: 'Fan capacity, minimum ventilation', unit: 'CFM', dec: 0, words: ['too low', 'too high'], val: t => t.fanMin },
-    { k: 'airExchMin', lim: 'airExchMin', label: 'Time to replace the barn’s air, minimum ventilation', unit: 'min', dec: 1, words: ['too short', 'too long'], val: t => t.airExchMin },
-    { k: 'spCalc', lim: 'spCalc', label: 'Pressure the fans work against', unit: 'in. w.c.', dec: 3, words: ['too low', 'too high'], val: t => t.spCalc }];
+    { k: 'airExch', lim: 'airExchangeSec', core: true, label: 'Time to replace the barn’s air, full ventilation', name: 'Air exchange', ph: ['Air is replaced too quickly', 'Air is replaced too slowly'], unit: 'sec', dec: 1, words: ['too short', 'too long'], sw: ['too fast', 'too slow'], val: t => t.airExchSec },
+    { k: 'perHeadMax', lim: 'flowMax', core: true, label: 'Fresh air per pig, full ventilation', name: 'Fresh air per pig', ph: ['Not enough fresh air per pig at full ventilation', 'Too much fresh air per pig at full ventilation'], unit: 'CFM per pig', dec: 0, words: ['too low', 'too high'], sw: ['too low', 'too high'], val: t => t.perHeadMax },
+    { k: 'perHeadMin', lim: 'flowMin', core: true, label: 'Fresh air per pig, minimum ventilation', name: 'Minimum air per pig', ph: ['Not enough fresh air per pig at minimum ventilation', 'Too much fresh air per pig at minimum ventilation'], unit: 'CFM per pig', dec: 1, words: ['too low', 'too high'], sw: ['too low', 'too high'], val: t => t.perHeadMin },
+    { k: 'airSpeed', lim: 'airSpeed', core: true, label: 'Air speed through the barn, full ventilation', name: 'Air speed', ph: ['Air moves too slowly through the barn', 'Air moves too fast through the barn'], unit: 'ft/min', dec: 0, words: ['too slow', 'too fast'], sw: ['too slow', 'too fast'], val: t => t.airSpeedMax },
+    { k: 'fanMax', lim: 'fanMax', label: 'Fan capacity, full ventilation', name: 'Fan capacity', ph: ['Fan capacity at full ventilation is too low', 'Fan capacity at full ventilation is too high'], unit: 'CFM', dec: 0, words: ['too low', 'too high'], sw: ['too low', 'too high'], val: t => t.fanMax },
+    { k: 'fanMin', lim: 'fanMin', label: 'Fan capacity, minimum ventilation', name: 'Minimum fan capacity', ph: ['Fan capacity at minimum ventilation is too low', 'Fan capacity at minimum ventilation is too high'], unit: 'CFM', dec: 0, words: ['too low', 'too high'], sw: ['too low', 'too high'], val: t => t.fanMin },
+    { k: 'airExchMin', lim: 'airExchMin', label: 'Time to replace the barn’s air, minimum ventilation', name: 'Minimum air exchange', ph: ['Air is replaced too quickly at minimum ventilation', 'Air is replaced too slowly at minimum ventilation'], unit: 'min', dec: 1, words: ['too short', 'too long'], sw: ['too fast', 'too slow'], val: t => t.airExchMin },
+    { k: 'spCalc', lim: 'spCalc', label: 'Pressure the fans work against', name: 'Fan pressure', ph: ['The pressure the fans work against is too low', 'The pressure the fans work against is too high'], unit: 'in. w.c.', dec: 3, words: ['too low', 'too high'], sw: ['too low', 'too high'], val: t => t.spCalc }];
   const PART_NAMES = { inlet: 'Air inlets', inletFilter: 'Inlet filters', coolCell: 'Cool cells', filter: 'Filter bank', soffit: 'Soffit openings', shutter: 'Shutters', damper: 'Min-vent dampers' };
-  const RC = { ok: '#1a8f4c', bad: '#c0392b', na: '#9aa6b2', band: '#cfeedd', track: '#e6ecf0', ink: '#333', brand: '#426170', blue: '#36BAF2' };
+  const RC = { ok: '#1a8f4c', bad: '#c0392b', na: '#9aa6b2', band: '#cfeedd', track: '#e6ecf0', ink: '#2b3b43', mute: '#6b7785', brand: '#426170', blue: '#36BAF2', pen: '#e6edf1' };
+  let svgUid = 0;
   function summaryModel(config, meta) {
     config = config || {}; meta = meta || {};
     const st = meta.siteType, designSite = st === 'proposed', out = { designSite, barns: [] };
@@ -5231,90 +5245,134 @@ const VENT = (function () {
       const ex = evalScenario(config, type, inst, 'existing'), pr = evalScenario(config, type, inst, 'proposed'), aEx = assess(ex), aPr = assess(pr);
       const showEx = !(meta.hideExisting || (designSite && !(ex.totals.fanMax > 0))), showPr = designSite || !aPr.incomplete;   // the report's own rule for which sides are on the page
       const mk = (key, res, a) => {
-        const label = key === 'existing' ? 'As installed' : (designSite ? 'Proposed design' : 'Proposed remodel'), reasons = [];
+        const label = key === 'existing' ? 'As installed' : (designSite ? 'Proposed design' : 'Proposed remodel'), reasons = [], shorts = [], bullets = [];
         const f = (v, d) => fmt(v, d);
-        GOAL_DEFS.forEach(g => { const r = res.ranges[g.k]; if (r && (r.s === 'low' || r.s === 'high')) reasons.push(g.label + ' is ' + g.words[r.s === 'low' ? 0 : 1] + ': ' + f(g.val(res.totals), g.dec) + ' ' + g.unit + ' against a goal of ' + limText(lim[g.lim]) + '.'); });
+        GOAL_DEFS.forEach(g => { const r = res.ranges[g.k]; if (r && (r.s === 'low' || r.s === 'high')) { const i = r.s === 'low' ? 0 : 1; reasons.push(g.label + ' is ' + g.words[i] + ': ' + f(g.val(res.totals), g.dec) + ' ' + g.unit + ' against a goal of ' + limText(lim[g.lim]) + '.'); shorts.push(g.name + ' ' + g.sw[i]); bullets.push(g.ph[i] + ': ' + f(g.val(res.totals), g.dec) + ' ' + g.unit + ' (goal ' + limText(lim[g.lim]) + ').'); } });
         CHECK_ROWS.forEach(([k]) => { const c = res.checks[k]; if (!c) return; const nm = k === 'shutter' ? shutterName([res.mode]) : PART_NAMES[k];
-          if (k === 'inlet' && !(c.cap > 0)) reasons.push('No air inlets are recorded.');
-          else if (c.cap > 0 && c.ref > 0 && !c.ok) reasons.push(nm + ' are too small: they can pass ' + Math.round(c.cap / c.ref * 100) + '% of what is needed.'); });
+          if (k === 'inlet' && !(c.cap > 0)) { reasons.push('No air inlets are recorded.'); shorts.push('No air inlets'); bullets.push('No air inlets are recorded.'); }
+          else if (c.cap > 0 && c.ref > 0 && !c.ok) { const t = nm + (k === 'filter' ? ' is' : ' are') + ' too small: they can pass ' + Math.round(c.cap / c.ref * 100) + '% of what is needed.'; reasons.push(t); bullets.push(t); shorts.push(nm + ' too small'); } });
         const status = a.incomplete ? { cls: 'na', label: 'No fans recorded yet' } : a.issues.length ? { cls: 'bad', label: key === 'existing' ? 'Under-ventilated' : 'Needs attention' } : { cls: 'ok', label: key === 'existing' ? 'Adequate as installed' : 'Meets targets' };
-        return { key, label, mode: res.mode, res, a, status, reasons, missing: (!a.incomplete && a.missing) || [] };
+        return { key, label, mode: res.mode, res, a, status, reasons, shorts, bullets, missing: (!a.incomplete && a.missing) || [] };
       };
       const scn = []; if (showEx) scn.push(mk('existing', ex, aEx)); if (showPr) scn.push(mk('proposed', pr, aPr));
       const goals = [];
       GOAL_DEFS.forEach(g => { const l = lim[g.lim]; if (!g.core && !l) return; const pts = scn.map(s => ({ key: s.key, v: g.val(s.res.totals), s: (s.res.ranges[g.k] || {}).s || 'na' })); if (pts.every(p => p.v == null || !isFinite(p.v))) return; goals.push({ k: g.k, label: g.label, unit: g.unit, dec: g.dec, lo: l ? l[0] : null, hi: l ? l[1] : null, pts }); });
       const parts = [];
       CHECK_ROWS.forEach(([k]) => { const items = scn.filter(s => s.res.checks[k]).map(s => { const c = s.res.checks[k]; return { key: s.key, cap: c.cap, ref: c.ref, pct: c.ref > 0 ? c.cap / c.ref : null, ok: !!c.ok, none: !(c.cap > 0), typed: !!c.typed }; });
-        if (!items.length || items.every(i => i.none)) return; parts.push({ k, label: k === 'shutter' ? shutterName(scn.map(s => s.mode)) : PART_NAMES[k], items }); });
+        if (!items.length || items.every(i => i.none)) return; parts.push({ k, label: k === 'shutter' ? shutterName(scn.map(s => s.mode)) : PART_NAMES[k], items }); });   // a part nothing is recorded for on any side is left out
       out.barns.push({ type, name: inst.name, title: type + ' — ' + inst.name, isFar, rooms, scn, goals, parts, repairs: meta.hideExisting ? 0 : countRepairs(inst),
         build: { l: num(inst.building.length), w: num(inst.building.width), h: num(inst.building.height), inv: num(inst.building.inventory) } });
     }));
     return out;
   }
-  // a horizontal goal bar: the green band is the goal, a dot (as installed) or diamond (proposed) is the result, green when it is inside and red when it is not
-  function goalBarSvg(g, scn) {
-    const W = 520, X0 = 16, X1 = W - 16, vs = g.pts.map(p => p.v).filter(v => v != null && isFinite(v));
-    const lo = g.lo, hi = g.hi, c1 = vs.concat(lo != null ? [lo] : [], hi != null ? [hi] : [], lo == null && hi != null ? [hi * 0.6] : []), c2 = vs.concat(lo != null ? [lo] : [], hi != null ? [hi] : [], hi == null && lo != null ? [lo * 1.4] : []);
-    let a = Math.min.apply(null, c1), b = Math.max.apply(null, c2); const span = (b - a) || Math.abs(b) || 1; const nonneg = c1.every(v => v >= 0); a -= span * 0.12; b += span * 0.12; if (nonneg && a < 0) a = 0;
-    const x = v => Math.max(X0, Math.min(X1, X0 + (v - a) / (b - a) * (X1 - X0))), tx = v => fmt(v, g.dec);
-    let s = '<svg class="rsvg" viewBox="0 0 ' + W + ' 50" role="img" aria-label="' + escH(g.label) + '"><rect x="' + X0 + '" y="22" width="' + (X1 - X0) + '" height="10" rx="5" fill="' + RC.track + '"/>';
-    if (lo != null || hi != null) { const bx0 = lo != null ? x(lo) : X0, bx1 = hi != null ? x(hi) : X1; s += '<rect x="' + bx0.toFixed(1) + '" y="19" width="' + Math.max(2, bx1 - bx0).toFixed(1) + '" height="16" rx="3" fill="' + RC.band + '" stroke="' + RC.ok + '" stroke-width="1"/>';
-      if (lo != null) s += '<text x="' + x(lo).toFixed(1) + '" y="47" text-anchor="middle">' + tx(lo) + '</text>'; if (hi != null) s += '<text x="' + x(hi).toFixed(1) + '" y="47" text-anchor="middle">' + tx(hi) + '</text>'; }
-    const pts = g.pts.filter(p => p.v != null && isFinite(p.v)), near = pts.length === 2 && Math.abs(x(pts[0].v) - x(pts[1].v)) < 50;
-    pts.forEach((p, i) => { const cx = x(p.v), col = p.s === 'ok' ? RC.ok : (p.s === 'low' || p.s === 'high') ? RC.bad : RC.na, cy = 27;
-      s += p.key === 'existing' ? '<circle cx="' + cx.toFixed(1) + '" cy="' + cy + '" r="7" fill="' + col + '" stroke="#fff" stroke-width="2"/>' : '<polygon points="' + [[cx, cy - 8], [cx + 8, cy], [cx, cy + 8], [cx - 8, cy]].map(q => q[0].toFixed(1) + ',' + q[1]).join(' ') + '" fill="' + col + '" stroke="#fff" stroke-width="2"/>';
-      const anchor = near ? (i === 0 ? 'end' : 'start') : 'middle', dx = near ? (i === 0 ? -6 : 6) : 0;
-      s += '<text class="rval" x="' + (cx + dx).toFixed(1) + '" y="11" text-anchor="' + anchor + '" fill="' + col + '">' + tx(p.v) + '</text>'; });
+  // small drawing helpers: a tick and a cross drawn as paths (so they print the same everywhere), an arrow, a fan
+  const svgTick = (x, y, c) => '<path d="M' + (x - 4) + ' ' + y + 'l3 3.2l5.5-6.4" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>';
+  const svgCross = (x, y, c) => '<path d="M' + (x - 3.5) + ' ' + (y - 3.5) + 'l7 7M' + (x + 3.5) + ' ' + (y - 3.5) + 'l-7 7" fill="none" stroke="' + c + '" stroke-width="2" stroke-linecap="round"/>';
+  const svgMark = (kind, x, y, c) => kind === 'ok' ? svgTick(x, y, c) : kind === 'bad' ? svgCross(x, y, c) : '';
+  const textW = (s, px) => String(s).length * (px || 11) * 0.56;
+  const hatch = id => '<defs><pattern id="' + id + '" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="6" height="6" fill="' + RC.bad + '"/><rect width="2.4" height="6" fill="#fff" opacity=".55"/></pattern></defs>';
+  // ONE chart for all the goal bars of a barn: the label (name, then the detail and the goal) on the left, the bar on the right. The green band is the goal; a dot (as installed) or a diamond
+  // (proposed) is the result, with its value and a tick (inside the goal) or a cross (outside).
+  function goalChartSvg(goals) {
+    const W = 700, BX0 = 268, BX1 = 676, rowH = 52, H = goals.length * rowH + 4; let s = '<svg class="rsvg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Airflow compared with the goals">';
+    goals.forEach((g, i) => {
+      const y0 = i * rowH + 2, vs = g.pts.map(p => p.v).filter(v => v != null && isFinite(v)), lo = g.lo, hi = g.hi;
+      const c1 = vs.concat(lo != null ? [lo] : [], hi != null ? [hi] : [], lo == null && hi != null ? [hi * 0.6] : []), c2 = vs.concat(lo != null ? [lo] : [], hi != null ? [hi] : [], hi == null && lo != null ? [lo * 1.4] : []);
+      let a = Math.min.apply(null, c1), b = Math.max.apply(null, c2); const span = (b - a) || Math.abs(b) || 1, nonneg = c1.every(v => v >= 0); a -= span * 0.14; b += span * 0.14; if (nonneg && a < 0) a = 0;
+      const x = v => Math.max(BX0, Math.min(BX1, BX0 + (v - a) / (b - a) * (BX1 - BX0))), tx = v => fmt(v, g.dec), parts = g.label.split(', '), goalTxt = (lo != null || hi != null) ? 'goal ' + limText([lo, hi]) + ' ' + g.unit : g.unit + ' · no goal set';
+      s += '<text class="rlab" x="0" y="' + (y0 + 19) + '">' + escH(parts[0]) + '</text><text class="rsub" x="0" y="' + (y0 + 32) + '">' + escH((parts[1] ? parts[1] + ' · ' : '') + goalTxt) + '</text>';
+      s += '<rect x="' + BX0 + '" y="' + (y0 + 24) + '" width="' + (BX1 - BX0) + '" height="10" rx="5" fill="' + RC.track + '"/>';
+      if (lo != null || hi != null) { const bx0 = lo != null ? x(lo) : BX0, bx1 = hi != null ? x(hi) : BX1; s += '<rect x="' + bx0.toFixed(1) + '" y="' + (y0 + 20) + '" width="' + Math.max(2, bx1 - bx0).toFixed(1) + '" height="18" rx="3" fill="' + RC.band + '" stroke="' + RC.ok + '" stroke-width="1.2"/>';
+        if (lo != null) s += '<text class="rtick" x="' + x(lo).toFixed(1) + '" y="' + (y0 + 49) + '" text-anchor="middle">' + tx(lo) + '</text>'; if (hi != null) s += '<text class="rtick" x="' + x(hi).toFixed(1) + '" y="' + (y0 + 49) + '" text-anchor="middle">' + tx(hi) + '</text>'; }
+      const pts = g.pts.filter(p => p.v != null && isFinite(p.v)), near = pts.length === 2 && Math.abs(x(pts[0].v) - x(pts[1].v)) < 78;
+      pts.forEach((p, k) => { const cx = x(p.v), cy = y0 + 29, col = p.s === 'ok' ? RC.ok : (p.s === 'low' || p.s === 'high') ? RC.bad : RC.na, kind = p.s === 'ok' ? 'ok' : (p.s === 'low' || p.s === 'high') ? 'bad' : '';
+        s += p.key === 'existing' ? '<circle cx="' + cx.toFixed(1) + '" cy="' + cy + '" r="8" fill="' + col + '" stroke="#fff" stroke-width="2"/>' : '<polygon points="' + [[cx, cy - 9], [cx + 9, cy], [cx, cy + 9], [cx - 9, cy]].map(q => q[0].toFixed(1) + ',' + q[1]).join(' ') + '" fill="' + col + '" stroke="#fff" stroke-width="2"/>';
+        const txt = tx(p.v), w = textW(txt, 12), left = near && k === 0, tcx = left ? cx - 8 - w / 2 - (kind ? 9 : 0) : near ? cx + 8 + w / 2 : cx - (kind ? 5 : 0), ty = y0 + 12;
+        s += '<text class="rval ' + (kind || 'na') + '" x="' + tcx.toFixed(1) + '" y="' + ty + '" text-anchor="middle">' + txt + '</text>'; if (kind) s += svgMark(kind, tcx + w / 2 + 8, ty - 4, col); });
+    });
     return s + '</svg>';
   }
-  // a part-size bar: how much of what is needed the part can pass (100% is the dashed line), green when it is enough
-  function partBarSvg(part, two) {
-    const W = 520, L = two ? 84 : 0, R = 62, bw = W - L - R, rowH = 22, H = 16 + part.items.length * rowH, x100 = L + bw / 1.5;
-    let s = '<svg class="rsvg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="' + escH(part.label) + '">';
-    part.items.forEach((it, i) => { const y = 14 + i * rowH, col = it.pct == null ? RC.na : it.ok ? RC.ok : RC.bad;
-      if (two) s += '<text x="0" y="' + (y + 10) + '">' + (it.key === 'existing' ? 'As installed' : 'Proposed') + '</text>';
-      s += '<rect x="' + L + '" y="' + y + '" width="' + bw + '" height="13" rx="3" fill="' + RC.track + '"/>';
-      if (it.none) s += '<text x="' + (L + 6) + '" y="' + (y + 10) + '" fill="' + RC.na + '">none recorded</text>';
-      else { s += '<rect x="' + L + '" y="' + y + '" width="' + Math.max(2, Math.min(it.pct == null ? 0.3 : it.pct, 1.5) / 1.5 * bw).toFixed(1) + '" height="13" rx="3" fill="' + col + '"/>'; s += '<text class="rval" x="' + (L + bw + 8) + '" y="' + (y + 10) + '" fill="' + col + '">' + (it.pct == null ? '—' : Math.round(it.pct * 100) + '%') + '</text>'; } });
-    return s + '<line x1="' + x100.toFixed(1) + '" y1="12" x2="' + x100.toFixed(1) + '" y2="' + (H - 2) + '" stroke="' + RC.ink + '" stroke-width="1.2" stroke-dasharray="3 2"/><text x="' + x100.toFixed(1) + '" y="8" text-anchor="middle">what is needed</text></svg>';
+  // ONE chart for all the part bars of a barn: each part has a bar per side showing how much of what is needed it can pass; the dashed line is 100%. A bar that falls short is hatched.
+  function partChartSvg(parts, two) {
+    const W = 700, BX0 = 252, BW = 380, x100 = BX0 + BW / 1.5, rowH = 14, gap = 9, pid = 'hx' + (++svgUid); let y = 22, s = '';
+    parts.forEach(p => {
+      p.items.forEach((it, i) => { const yy = y + i * rowH, col = it.pct == null ? RC.na : it.ok ? RC.ok : RC.bad;
+        if (i === 0) s += '<text class="rlab" x="0" y="' + (yy + 11) + '">' + escH(p.label) + '</text>';
+        if (two) s += '<text class="rsub" x="' + (BX0 - 8) + '" y="' + (yy + 10) + '" text-anchor="end">' + (it.key === 'existing' ? 'As installed' : 'Proposed') + '</text>';
+        s += '<rect x="' + BX0 + '" y="' + yy + '" width="' + BW + '" height="11" rx="3" fill="' + RC.track + '"/>';
+        if (it.none) s += '<text class="rsub" x="' + (BX0 + 7) + '" y="' + (yy + 10) + '">none recorded</text>';
+        else { const w = Math.max(3, Math.min(it.pct == null ? 0.3 : it.pct, 1.5) / 1.5 * BW); s += '<rect x="' + BX0 + '" y="' + yy + '" width="' + w.toFixed(1) + '" height="11" rx="3" fill="' + (it.ok || it.pct == null ? col : 'url(#' + pid + ')') + '"/>';
+          const label = it.pct == null ? '—' : Math.round(it.pct * 100) + '%'; s += '<text class="rval ' + (it.pct == null ? 'na' : it.ok ? 'ok' : 'bad') + '" x="' + (BX0 + BW + 12) + '" y="' + (yy + 10) + '">' + label + '</text>' + svgMark(it.pct == null ? '' : it.ok ? 'ok' : 'bad', BX0 + BW + 12 + textW(label, 12) + 12, yy + 6, col); } });
+      y += p.items.length * rowH + gap; });
+    const H = y + 2;
+    return '<svg class="rsvg" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Are the parts big enough?">' + hatch(pid) + s + '<line x1="' + x100.toFixed(1) + '" y1="14" x2="' + x100.toFixed(1) + '" y2="' + (H - 4) + '" stroke="' + RC.ink + '" stroke-width="1.3" stroke-dasharray="4 3"/><text class="rtick" x="' + x100.toFixed(1) + '" y="9" text-anchor="middle">100% = what is needed</text></svg>';
   }
-  // a small plan-view picture of how air moves: negative pressure (fans pull air out) or positive (fans push filtered air in)
+  // the legend by example, drawn like the real charts
+  function legendSvg() {
+    const pid = 'hx' + (++svgUid);
+    return '<svg class="rsvg rlegend" viewBox="0 0 700 78" role="img" aria-label="How to read the charts">' + hatch(pid) +
+      '<text class="rlab" x="0" y="12">Goal bars</text><rect x="0" y="30" width="316" height="10" rx="5" fill="' + RC.track + '"/><rect x="96" y="26" width="120" height="18" rx="3" fill="' + RC.band + '" stroke="' + RC.ok + '" stroke-width="1.2"/>' +
+      '<circle cx="156" cy="35" r="8" fill="' + RC.ok + '" stroke="#fff" stroke-width="2"/>' + svgTick(190, 20, RC.ok) + '<polygon points="270,26 279,35 270,44 261,35" fill="' + RC.bad + '" stroke="#fff" stroke-width="2"/>' + svgCross(296, 20, RC.bad) +
+      '<text class="rtick" x="156" y="62" text-anchor="middle">result inside the goal</text><text class="rtick" x="270" y="62" text-anchor="middle">outside the goal</text><text class="rtick" x="156" y="74" text-anchor="middle">(green band = the goal)</text>' +
+      '<text class="rlab" x="372" y="12">Part bars</text><rect x="372" y="22" width="225" height="12" rx="3" fill="' + RC.track + '"/><rect x="372" y="22" width="165" height="12" rx="3" fill="' + RC.ok + '"/><rect x="372" y="44" width="225" height="12" rx="3" fill="' + RC.track + '"/><rect x="372" y="44" width="115" height="12" rx="3" fill="url(#' + pid + ')"/>' +
+      '<line x1="522" y1="18" x2="522" y2="60" stroke="' + RC.ink + '" stroke-width="1.3" stroke-dasharray="4 3"/><text class="rval ok" x="612" y="32">enough</text><text class="rval bad" x="612" y="54">too small</text><text class="rtick" x="522" y="72" text-anchor="middle">100% = what is needed</text></svg>';
+  }
+  // How the air moves: a plan view of a barn, drawn for negative pressure (exhaust fans pull air out) or positive (supply fans push filtered air in, it leaves through the sidewalls)
   function airflowSvg(mode) {
-    const arrow = (x1, y1, x2, y2, col) => { const dx = x2 - x1, dy = y2 - y1, L = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / L, uy = dy / L, hx = x2 - ux * 9, hy = y2 - uy * 9; return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + hx.toFixed(1) + '" y2="' + hy.toFixed(1) + '" stroke="' + col + '" stroke-width="3"/><polygon points="' + x2 + ',' + y2 + ' ' + (hx - uy * 5).toFixed(1) + ',' + (hy + ux * 5).toFixed(1) + ' ' + (hx + uy * 5).toFixed(1) + ',' + (hy - ux * 5).toFixed(1) + '" fill="' + col + '"/>'; };
-    const fan = (cx, cy) => '<circle cx="' + cx + '" cy="' + cy + '" r="11" fill="#fff" stroke="' + RC.brand + '" stroke-width="2"/><path d="M' + (cx - 7) + ' ' + cy + 'L' + (cx + 7) + ' ' + cy + 'M' + cx + ' ' + (cy - 7) + 'L' + cx + ' ' + (cy + 7) + '" stroke="' + RC.brand + '" stroke-width="2"/>';
-    let s = '<svg class="rsvg rair" viewBox="0 0 360 150" role="img" aria-label="' + (mode === POS ? 'Positive pressure airflow' : 'Negative pressure airflow') + '"><rect x="70" y="40" width="220" height="70" rx="4" fill="#f4f8fa" stroke="' + RC.brand + '" stroke-width="2"/>';
-    if (mode === POS) {
-      s += '<rect x="52" y="48" width="12" height="54" fill="#dbe6ec" stroke="' + RC.brand + '"/><text x="58" y="124" text-anchor="middle">filter bank</text>' + fan(34, 75) + arrow(46, 75, 100, 75, RC.blue) + arrow(110, 75, 160, 75, RC.blue) + arrow(170, 75, 220, 75, RC.blue);
-      [110, 180, 250].forEach(x => { s += arrow(x, 40, x, 10, RC.ok) + arrow(x, 110, x, 140, RC.ok); }); s += '<text x="180" y="8" text-anchor="middle">air out: sidewall shutters and dampers</text><text x="34" y="100" text-anchor="middle">supply fans</text>';
+    const arrow = (x1, y1, x2, y2, col, w) => { const dx = x2 - x1, dy = y2 - y1, L = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / L, uy = dy / L, hx = x2 - ux * 9, hy = y2 - uy * 9, hw = 5.5; return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + hx.toFixed(1) + '" y2="' + hy.toFixed(1) + '" stroke="' + col + '" stroke-width="' + (w || 3) + '" stroke-linecap="round"/><polygon points="' + x2 + ',' + y2 + ' ' + (hx - uy * hw).toFixed(1) + ',' + (hy + ux * hw).toFixed(1) + ' ' + (hx + uy * hw).toFixed(1) + ',' + (hy - ux * hw).toFixed(1) + '" fill="' + col + '"/>'; };
+    const fan = (cx, cy, r) => { let t = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#fff" stroke="' + RC.brand + '" stroke-width="2"/>'; [0, 120, 240].forEach(a => { t += '<ellipse cx="0" cy="' + (-r * 0.42) + '" rx="' + (r * 0.26) + '" ry="' + (r * 0.5) + '" fill="' + RC.brand + '" transform="translate(' + cx + ' ' + cy + ') rotate(' + a + ')"/>'; }); return t + '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.2) + '" fill="#fff"/>'; };
+    const strip = (x, y, w, h, kind) => { let t = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="#dbe6ec" stroke="' + RC.brand + '" stroke-width="1.2"/>'; if (kind === 'v') for (let i = x + 6; i < x + w - 2; i += 7) t += '<line x1="' + i + '" y1="' + y + '" x2="' + i + '" y2="' + (y + h) + '" stroke="' + RC.brand + '" stroke-width="1" opacity=".6"/>'; else for (let j = y + 3; j < y + h - 1; j += 3) t += '<line x1="' + x + '" y1="' + j + '" x2="' + (x + w) + '" y2="' + j + '" stroke="' + RC.brand + '" stroke-width="1" opacity=".6"/>'; return t; };
+    const pos = mode === POS, BX0 = 48, BX1 = 300, BY0 = 62, BY1 = 162;
+    let s = '<svg class="rsvg rair" viewBox="0 0 360 208" role="img" aria-label="' + (pos ? 'Positive pressure airflow' : 'Negative pressure airflow') + '"><rect x="' + BX0 + '" y="' + BY0 + '" width="' + (BX1 - BX0) + '" height="' + (BY1 - BY0) + '" rx="6" fill="#f4f8fa" stroke="' + RC.brand + '" stroke-width="2.6"/>';
+    for (let i = 0; i < 7; i++) s += '<rect x="' + (56 + i * 33) + '" y="70" width="29" height="26" rx="3" fill="' + RC.pen + '"/><rect x="' + (56 + i * 33) + '" y="128" width="29" height="26" rx="3" fill="' + RC.pen + '"/>';
+    s += '<polygon points="58,106 280,106 280,98 296,112 280,126 280,118 58,118" fill="' + RC.blue + '" opacity=".38"/>';
+    if (!pos) {
+      s += strip(70, 58, 108, 8, 'v') + strip(70, 158, 108, 8, 'v');
+      [84, 108, 132, 156].forEach(x => { s += arrow(x, 34, x, 57, RC.blue, 3) + arrow(x, 190, x, 167, RC.blue, 3); });
+      s += '<text class="rlab" x="70" y="13">Fresh air in</text><text class="rsub" x="70" y="25">soffit, inlets, filters</text>';
+      [84, 112, 140].forEach(y => { s += fan(300, y, 12) + arrow(316, y, 352, y, RC.ok, 3); });
+      s += '<text class="rlab" x="330" y="182" text-anchor="middle">Fans pull</text><text class="rlab" x="330" y="195" text-anchor="middle">air out</text>';
     } else {
-      [100, 180].forEach(x => { s += arrow(x, 12, x, 40, RC.blue); }); s += arrow(60, 75, 78, 75, RC.blue) + '<text x="150" y="8" text-anchor="middle">air in: soffit, inlets, filters</text>';
-      s += fan(300, 62) + fan(300, 90) + arrow(312, 75, 352, 75, RC.ok) + '<text x="320" y="124" text-anchor="middle">exhaust fans</text>';
+      s += strip(30, 72, 10, 80, 'v');
+      [84, 112, 140].forEach(y => { s += fan(14, y, 11) + arrow(27, y, 66, y, RC.blue, 3); });
+      s += '<text class="rlab" x="0" y="180">Supply fans</text><text class="rsub" x="0" y="192">+ filter bank</text>';
+      [112, 162, 212, 262].forEach(x => { [84, 140].forEach(y => { s += '<polygon points="' + (x - 5) + ',' + (y - 4) + ' ' + (x + 5) + ',' + (y - 4) + ' ' + x + ',' + (y + 5) + '" fill="' + RC.blue + '" stroke="#fff" stroke-width="1.2"/>'; }); });
+      s += '<path d="M96 22 L96 40 L112 79" fill="none" stroke="' + RC.mute + '" stroke-width="1" stroke-dasharray="2 2"/><text class="rsub" x="52" y="15">ceiling inlets spread the air</text>';
+      s += strip(190, 58, 100, 8, 'h') + strip(190, 158, 100, 8, 'h');
+      [205, 240, 275].forEach(x => { s += arrow(x, 56, x, 33, RC.ok, 3) + arrow(x, 168, x, 191, RC.ok, 3); });
+      s += '<text class="rlab" x="190" y="14">Air out</text><text class="rsub" x="190" y="26">sidewall shutters and dampers</text>';
     }
     return s + '</svg>';
   }
+  const glyph = c => c === 'ok' ? '✓' : c === 'bad' ? '✕' : '–';
   function summaryHtml(model, meta) {
-    const st = meta.siteType, f = (v, d) => fmt(v, d);
     let h = '<div class="rsum"><h1 class="rh1">Summary</h1><p class="rlead">' + (model.designSite ? 'This report checks the proposed ventilation design for each barn against the goals for that kind of barn.' : 'This report checks the ventilation in each barn against the goals for that kind of barn' + (model.barns.some(b => b.scn.some(s => s.key === 'proposed')) ? ', and the proposed remodel where one has been sized.' : '.')) + '</p>';
     if (!model.barns.length) return h + '<p class="rpt-empty">No barns recorded yet.</p></div>';
     h += '<div class="rglance">';
-    model.barns.forEach(b => { h += '<div class="rg-row"><div class="rg-name">' + escH(b.title) + (b.isFar ? ' <span class="pbadge">per room</span>' : '') + '</div><div class="rg-st">' + b.scn.map(s => '<span class="rst ' + s.status.cls + '"><b>' + escH(b.scn.length > 1 ? s.label + ': ' : '') + '</b>' + escH(s.status.label) + '</span>').join('') + '</div>';
-      const note = s => (b.scn.length > 1 ? '<b>' + escH(s.label) + ':</b> ' : '') + (s.status.cls === 'ok' ? 'every goal is met and every part is big enough.' : s.status.cls === 'na' ? 'add the fans to check this barn.' : escH(s.reasons[0] || '') + (s.reasons.length > 1 ? ' (and ' + (s.reasons.length - 1) + ' more)' : '')); h += '<div class="rg-note">' + b.scn.map(note).join('<br>') + '</div></div>'; });
-    h += '</div><h2 class="rh2">How the air moves</h2><div class="rair-row">';
-    const modes = []; model.barns.forEach(b => b.scn.forEach(s => { if (modes.indexOf(s.mode) < 0) modes.push(s.mode); }));
-    modes.forEach(m => { h += '<figure class="rfig">' + airflowSvg(m) + '<figcaption>' + (m === POS ? '<b>Positive pressure.</b> Supply fans push filtered air in through the filter bank and cool cells. It leaves through the sidewall shutters and dampers.' : '<b>Negative pressure.</b> Exhaust fans pull air out of the barn. Fresh air comes in through the soffit, inlets and filters.') + '</figcaption></figure>'; });
-    return h + '</div><h2 class="rh2">How to read the charts</h2><p class="rhelp"><b>Goal bars:</b> the green band is the goal. The dot (as installed) or diamond (proposed) is the result: green when it is inside the goal, red when it is not. <b>Part bars:</b> how much of the air the fans move that the part can pass. The dashed line is 100%, which is enough.</p></div>';
+    model.barns.forEach(b => {
+      h += '<div class="rg-row"><div class="rg-name">' + escH(b.title) + (b.isFar ? ' <span class="pbadge">per room</span>' : '') + '</div><div class="rg-sides">';
+      b.scn.forEach(s => { const note = s.status.cls === 'ok' ? 'Every goal is met and every part is big enough.' : s.status.cls === 'na' ? 'Add the fans to check this barn.' : escH(s.shorts.slice(0, 2).join(', ')) + (s.shorts.length > 2 ? ' and ' + (s.shorts.length - 2) + ' more' : '');
+        h += '<div class="rg-side"><span class="rst ' + s.status.cls + '"><i class="gl">' + glyph(s.status.cls) + '</i> ' + escH(b.scn.length > 1 ? s.label + ': ' : '') + escH(s.status.label) + '</span><span class="rg-short">' + note + '</span></div>'; });
+      h += '</div></div>'; });
+    return h + '</div><h2 class="rh2">How to read the charts</h2>' + legendSvg() + '</div>';
   }
   function barnSummaryHtml(b) {
-    const two = b.scn.length > 1;
-    let h = '<div class="rbarn"><h2 class="rh2 rb-t">' + escH(b.title) + (b.isFar ? ' <span class="pbadge">per room</span>' : '') + '</h2><p class="pbuild">' + (b.isFar ? 'Room ' : '') + fmt(b.build.l, 1) + ' × ' + fmt(b.build.w, 1) + ' × ' + fmt(b.build.h, 1) + ' ft · ' + fmt(b.build.inv) + (b.isFar ? ' head per room · ' + fmt(b.rooms) + ' rooms' : ' head') + '</p>';
-    h += '<div class="rverd">' + b.scn.map(s => '<span class="rst ' + s.status.cls + '"><b>' + escH(s.label) + ':</b> ' + escH(s.status.label) + '</span>').join('') + '</div>';
-    h += '<h3 class="rh3">What we found</h3>';
-    b.scn.forEach(s => { if (s.status.cls === 'na') h += '<p class="rfind">' + escH(s.label) + ': no fans are recorded yet.</p>'; else if (!s.reasons.length) h += '<p class="rfind ok">' + escH(s.label) + ': every goal is met and every part is big enough.</p>'; else h += '<p class="rfind">' + escH(s.label) + ':</p><ul class="rreasons">' + s.reasons.map(r => '<li>' + escH(r) + '</li>').join('') + '</ul>'; if (s.missing.length) h += '<p class="rmiss">Not recorded, so not counted: ' + escH(s.missing.join(', ')) + '.</p>'; });
-    if (b.repairs) h += '<p class="rfind warn">' + b.repairs + ' equipment item' + (b.repairs > 1 ? 's are' : ' is') + ' flagged for repair or replacement.</p>';
-    if (b.goals.length) { h += '<h3 class="rh3">Airflow compared with the goals</h3>' + (two ? '<p class="rleg"><span class="lg-c"></span> As installed &nbsp; <span class="lg-d"></span> Proposed</p>' : '');
-      b.goals.forEach(g => { h += '<div class="rgoal"><div class="rg-l">' + escH(g.label) + ' <span class="rg-u">(' + escH(g.unit) + (g.lo != null || g.hi != null ? '; goal ' + limText([g.lo, g.hi]) : '; no goal set') + ')</span></div>' + goalBarSvg(g, b.scn) + '</div>'; }); }
-    if (b.parts.length) { h += '<h3 class="rh3">Are the parts big enough?</h3>'; b.parts.forEach(p => { h += '<div class="rgoal"><div class="rg-l">' + escH(p.label) + '</div>' + partBarSvg(p, two) + '</div>'; }); }
+    const two = b.scn.length > 1, pn = m => m === POS ? 'positive pressure' : 'negative pressure', modes = b.scn.map(s => s.mode).filter((m, i, a) => a.indexOf(m) === i);
+    let h = '<div class="rbarn"><h2 class="rh2 rb-t">' + escH(b.title) + (b.isFar ? ' <span class="pbadge">per room</span>' : '') + '</h2><p class="pbuild">' + (b.isFar ? 'Room ' : '') + fmt(b.build.l, 1) + ' × ' + fmt(b.build.w, 1) + ' × ' + fmt(b.build.h, 1) + ' ft · ' + fmt(b.build.inv) + (b.isFar ? ' head per room · ' + fmt(b.rooms) + ' rooms' : ' head') + (modes.length === 1 && modes[0] === POS ? ' · ' + pn(POS) : modes.length > 1 ? ' · ' + b.scn.map(s => s.label.toLowerCase() + ': ' + pn(s.mode)).join(', ') : '') + '</p>';
+    h += '<div class="rverd">' + b.scn.map(s => '<span class="rst ' + s.status.cls + '"><i class="gl">' + glyph(s.status.cls) + '</i> <b>' + escH(s.label) + ':</b> ' + escH(s.status.label) + '</span>').join('') + '</div><h3 class="rh3">What we found</h3><div class="rcols ' + (two ? 'two' : 'one') + '">';
+    b.scn.forEach(s => { h += '<div class="rcol">' + (two ? '<div class="rcol-h">' + escH(s.label) + '</div>' : '');
+      if (s.status.cls === 'na') h += '<p class="rfind">No fans are recorded yet.</p>'; else if (!s.reasons.length) h += '<p class="rfind ok">Every goal is met and every part is big enough.</p>'; else h += '<ul class="rreasons">' + s.bullets.map(r => '<li>' + escH(r) + '</li>').join('') + '</ul>';
+      if (s.missing.length) h += '<p class="rmiss">Not recorded, so not counted: ' + escH(s.missing.join(', ')) + '.</p>'; h += '</div>'; });
+    h += '</div>'; if (b.repairs) h += '<p class="rfind warn">' + b.repairs + ' equipment item' + (b.repairs > 1 ? 's are' : ' is') + ' flagged for repair or replacement.</p>';
+    if (b.goals.length) h += '<h3 class="rh3">Airflow compared with the goals</h3>' + (two ? '<p class="rleg"><span class="lg-c"></span> As installed &nbsp;&nbsp; <span class="lg-d"></span> Proposed</p>' : '') + goalChartSvg(b.goals);
+    if (b.parts.length) h += '<h3 class="rh3">Are the parts big enough?</h3>' + partChartSvg(b.parts, two);
     return h + '</div>';
+  }
+  function guideHtml(model) {
+    const modes = []; model.barns.forEach(b => b.scn.forEach(s => { if (modes.indexOf(s.mode) < 0) modes.push(s.mode); })); if (!modes.length) return '';
+    let h = '<div class="rguide"><h2 class="rh2">How the air moves</h2><div class="rair-row">';
+    modes.forEach(m => { h += '<figure class="rfig">' + airflowSvg(m) + '<figcaption>' + (m === POS ? '<b>Positive pressure.</b> Supply fans push filtered air in through the filter bank and cool cells, and the ceiling inlets spread it through the barn. The barn is held slightly above the outside pressure, so the air leaves through the sidewall shutters and dampers. There are no exhaust fans.' : '<b>Negative pressure.</b> Exhaust fans pull air out of the barn. Fresh air comes in through the soffit, inlets and filters, and through the cool cells in hot weather.') + '</figcaption></figure>'; });
+    return h + '</div></div>';
   }
   function renderReport(container, config, meta, done) {
     resolveAllPhotos(config || {}, map => { renderReportSync(container, config, meta, map); if (typeof done === 'function') done(); });
@@ -5465,7 +5523,7 @@ const VENT = (function () {
       '<div class="sig-seal">P.E.<br>Seal</div></div>';
     tail += (style === 'summary' ? '<p class="rpt-foot"><b>This ' + (designSite ? 'design' : 'audit') + ' is for preliminary assessment only</b> — it must be reviewed and sealed by a licensed professional engineer before use in design or construction. Fans and inlets are rated from the manufacturers’ published tables where one is loaded.</p>' : '<p class="rpt-foot">Calculations replicate the ventilation worksheets. Fans and inlets use the manufacturer’s published tables where one is loaded; a fan or inlet without one is marked as a workbook curve (or, if its curve is unusable, as needing a rated CFM), and one used beyond its table is marked as beyond published data. Filters and cool cells use the workbook’s polynomial curves. Farrowing is computed on a per-room basis.' + ((pressureOf(config, 'existing') === POS || pressureOf(config, 'proposed') === POS) ? ' Positive-pressure barns follow JEG’s Positive template (2-25-26 SD Sow Positive): supply fans work against the filter bank, cool cells, head loss, max vent shutter and the pressure held in the barn; inlets must carry the full max-vent flow.' : '') + ' <b>This ' + (designSite ? 'design' : 'audit') + ' is for preliminary assessment only</b> — it must be reviewed and sealed by a licensed professional engineer before use in design or construction.</p>');
     let body = techHtml;
-    if (style) { const model = summaryModel(config, meta); body = summaryHtml(model, meta) + model.barns.map(barnSummaryHtml).join('') + (style === 'full' && any ? '<div class="rtech"><h1 class="rh1">Technical details</h1><p class="rlead">The numbers, assumptions and equipment behind the charts.</p>' + techHtml + '</div>' : ''); }
+    if (style) { const model = summaryModel(config, meta); body = summaryHtml(model, meta) + model.barns.map(barnSummaryHtml).join('') + guideHtml(model) + (style === 'full' && any ? '<div class="rtech"><h1 class="rh1">Technical details</h1><p class="rlead">The numbers, assumptions and equipment behind the charts.</p>' + techHtml + '</div>' : ''); }
     container.innerHTML = headHtml + body + tail;
   }
 
