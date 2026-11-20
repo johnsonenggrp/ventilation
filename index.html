@@ -460,7 +460,11 @@ table.pcond td.lcol{white-space:normal}
 .rh2{font-family:var(--font-heading);font-size:15px;color:var(--brand);margin:16px 0 6px;border-bottom:1px solid var(--line);padding-bottom:3px}
 .rh3{font-family:var(--font-heading);font-size:13px;color:var(--brand-d);margin:10px 0 3px;break-after:avoid;page-break-after:avoid}
 .rlead{font-size:13px;color:#333;margin:0 0 8px;line-height:1.45}
-.rg-row{display:grid;grid-template-columns:160px 1fr;gap:4px 14px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);page-break-inside:avoid}
+.rsum .rpt-sign{margin-top:14px;gap:22px}
+.rsum .sig-line{height:26px}
+.rsum .sig-seal{width:66px;height:66px;font-size:10px}
+.rsum .rpt-foot{margin-top:8px;padding-top:6px}
+.rg-row{display:grid;grid-template-columns:160px 1fr;gap:4px 14px;align-items:center;padding:4px 0;border-bottom:1px solid var(--line);page-break-inside:avoid}
 .rg-name{font-weight:700;font-size:13px;color:var(--ink)}
 .rg-sides{display:flex;flex-direction:column;gap:4px}
 .rg-side{display:flex;align-items:center;gap:10px}
@@ -490,15 +494,11 @@ table.pcond td.lcol{white-space:normal}
 .rsvg text.rval.ok{fill:#1a8f4c}
 .rsvg text.rval.bad{fill:#c0392b}
 .rsvg text.rval.na{fill:#6b7785}
-.rair-row{display:flex;gap:22px;flex-wrap:wrap}
-.rfig{margin:0;flex:1 1 300px;max-width:520px}
-.rfig figcaption{font-size:12px;color:#333;line-height:1.5;margin-top:6px}
 .rleg{font-size:11.5px;color:#444;margin:2px 0 4px}
 .rleg .lg-c,.rleg .lg-d{display:inline-block;width:11px;height:11px;background:#666;vertical-align:-1px;margin-right:3px}
 .rleg .lg-c{border-radius:50%}
 .rleg .lg-d{transform:rotate(45deg) scale(.8)}
 .rbarn{page-break-before:always}
-.rguide{page-break-before:always}
 .rtech{page-break-before:always}
 .rtech>.rh1,.rtech>.rlead{break-after:avoid;page-break-after:avoid}
 @media print{
@@ -5218,9 +5218,8 @@ const VENT = (function () {
     return notes;
   }
   /* ---- the summary report: plain words and charts instead of tables ----
-     renderReport(container, config, meta) with meta.style === 'summary' draws this (a one-page summary of every barn, then one page per barn with goal bars and part-size bars, then a page
-     showing how the air moves); meta.style === 'full' is the same followed by the old tables as "Technical details"; no style is the old tables, exactly as before.
-     summaryModel works out everything that is said and drawn (so a test can check it without reading HTML); summaryHtml / barnSummaryHtml / guideHtml draw it. Every chart is inline SVG, no
+     renderReport(container, config, meta) with meta.style === 'summary' draws this (a one-page summary of every barn, then one page per barn with goal bars and part-size bars, then the signature block); meta.style === 'full' is the same followed by the old tables as "Technical details"; no style is the old tables, exactly as before.
+     summaryModel works out everything that is said and drawn (so a test can check it without reading HTML); summaryHtml / barnSummaryHtml draw it. Every chart is inline SVG, no
      library. Nothing depends on colour alone (a PDF is often printed in grey): the result marks have shapes (dot / diamond) and a tick or a cross, and a part that is too small is hatched. */
   const escH = s => (s == null ? '' : String(s)).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   // the boxes of the Results section that get a bar. core: always drawn (a goal from the template), the rest only when the barn was given a goal. words: what it is when it is under / over the goal;
@@ -5317,35 +5316,8 @@ const VENT = (function () {
       '<text class="rlab" x="372" y="12">Part bars</text><rect x="372" y="22" width="225" height="12" rx="3" fill="' + RC.track + '"/><rect x="372" y="22" width="165" height="12" rx="3" fill="' + RC.ok + '"/><rect x="372" y="44" width="225" height="12" rx="3" fill="' + RC.track + '"/><rect x="372" y="44" width="115" height="12" rx="3" fill="url(#' + pid + ')"/>' +
       '<line x1="522" y1="18" x2="522" y2="60" stroke="' + RC.ink + '" stroke-width="1.3" stroke-dasharray="4 3"/><text class="rval ok" x="612" y="32">enough</text><text class="rval bad" x="612" y="54">too small</text><text class="rtick" x="522" y="72" text-anchor="middle">100% = what is needed</text></svg>';
   }
-  // How the air moves: a plan view of a barn, drawn for negative pressure (exhaust fans pull air out) or positive (supply fans push filtered air in, it leaves through the sidewalls)
-  function airflowSvg(mode) {
-    const arrow = (x1, y1, x2, y2, col, w) => { const dx = x2 - x1, dy = y2 - y1, L = Math.sqrt(dx * dx + dy * dy) || 1, ux = dx / L, uy = dy / L, hx = x2 - ux * 9, hy = y2 - uy * 9, hw = 5.5; return '<line x1="' + x1 + '" y1="' + y1 + '" x2="' + hx.toFixed(1) + '" y2="' + hy.toFixed(1) + '" stroke="' + col + '" stroke-width="' + (w || 3) + '" stroke-linecap="round"/><polygon points="' + x2 + ',' + y2 + ' ' + (hx - uy * hw).toFixed(1) + ',' + (hy + ux * hw).toFixed(1) + ' ' + (hx + uy * hw).toFixed(1) + ',' + (hy - ux * hw).toFixed(1) + '" fill="' + col + '"/>'; };
-    const fan = (cx, cy, r) => { let t = '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '" fill="#fff" stroke="' + RC.brand + '" stroke-width="2"/>'; [0, 120, 240].forEach(a => { t += '<ellipse cx="0" cy="' + (-r * 0.42) + '" rx="' + (r * 0.26) + '" ry="' + (r * 0.5) + '" fill="' + RC.brand + '" transform="translate(' + cx + ' ' + cy + ') rotate(' + a + ')"/>'; }); return t + '<circle cx="' + cx + '" cy="' + cy + '" r="' + (r * 0.2) + '" fill="#fff"/>'; };
-    const strip = (x, y, w, h, kind) => { let t = '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '" fill="#dbe6ec" stroke="' + RC.brand + '" stroke-width="1.2"/>'; if (kind === 'v') for (let i = x + 6; i < x + w - 2; i += 7) t += '<line x1="' + i + '" y1="' + y + '" x2="' + i + '" y2="' + (y + h) + '" stroke="' + RC.brand + '" stroke-width="1" opacity=".6"/>'; else for (let j = y + 3; j < y + h - 1; j += 3) t += '<line x1="' + x + '" y1="' + j + '" x2="' + (x + w) + '" y2="' + j + '" stroke="' + RC.brand + '" stroke-width="1" opacity=".6"/>'; return t; };
-    const pos = mode === POS, BX0 = 48, BX1 = 300, BY0 = 62, BY1 = 162;
-    let s = '<svg class="rsvg rair" viewBox="0 0 360 208" role="img" aria-label="' + (pos ? 'Positive pressure airflow' : 'Negative pressure airflow') + '"><rect x="' + BX0 + '" y="' + BY0 + '" width="' + (BX1 - BX0) + '" height="' + (BY1 - BY0) + '" rx="6" fill="#f4f8fa" stroke="' + RC.brand + '" stroke-width="2.6"/>';
-    for (let i = 0; i < 7; i++) s += '<rect x="' + (56 + i * 33) + '" y="70" width="29" height="26" rx="3" fill="' + RC.pen + '"/><rect x="' + (56 + i * 33) + '" y="128" width="29" height="26" rx="3" fill="' + RC.pen + '"/>';
-    s += '<polygon points="58,106 280,106 280,98 296,112 280,126 280,118 58,118" fill="' + RC.blue + '" opacity=".38"/>';
-    if (!pos) {
-      s += strip(70, 58, 108, 8, 'v') + strip(70, 158, 108, 8, 'v');
-      [84, 108, 132, 156].forEach(x => { s += arrow(x, 34, x, 57, RC.blue, 3) + arrow(x, 190, x, 167, RC.blue, 3); });
-      s += '<text class="rlab" x="70" y="13">Fresh air in</text><text class="rsub" x="70" y="25">soffit, inlets, filters</text>';
-      [84, 112, 140].forEach(y => { s += fan(300, y, 12) + arrow(316, y, 352, y, RC.ok, 3); });
-      s += '<text class="rlab" x="330" y="182" text-anchor="middle">Fans pull</text><text class="rlab" x="330" y="195" text-anchor="middle">air out</text>';
-    } else {
-      s += strip(30, 72, 10, 80, 'v');
-      [84, 112, 140].forEach(y => { s += fan(14, y, 11) + arrow(27, y, 66, y, RC.blue, 3); });
-      s += '<text class="rlab" x="0" y="180">Supply fans</text><text class="rsub" x="0" y="192">+ filter bank</text>';
-      [112, 162, 212, 262].forEach(x => { [84, 140].forEach(y => { s += '<polygon points="' + (x - 5) + ',' + (y - 4) + ' ' + (x + 5) + ',' + (y - 4) + ' ' + x + ',' + (y + 5) + '" fill="' + RC.blue + '" stroke="#fff" stroke-width="1.2"/>'; }); });
-      s += '<path d="M96 22 L96 40 L112 79" fill="none" stroke="' + RC.mute + '" stroke-width="1" stroke-dasharray="2 2"/><text class="rsub" x="52" y="15">ceiling inlets spread the air</text>';
-      s += strip(190, 58, 100, 8, 'h') + strip(190, 158, 100, 8, 'h');
-      [205, 240, 275].forEach(x => { s += arrow(x, 56, x, 33, RC.ok, 3) + arrow(x, 168, x, 191, RC.ok, 3); });
-      s += '<text class="rlab" x="190" y="14">Air out</text><text class="rsub" x="190" y="26">sidewall shutters and dampers</text>';
-    }
-    return s + '</svg>';
-  }
   const glyph = c => c === 'ok' ? '✓' : c === 'bad' ? '✕' : '–';
-  function summaryHtml(model, meta) {
+  function summaryHtml(model, meta, extra) {
     let h = '<div class="rsum"><h1 class="rh1">Summary</h1><p class="rlead">' + (model.designSite ? 'This report checks the proposed ventilation design for each barn against the goals for that kind of barn.' : 'This report checks the ventilation in each barn against the goals for that kind of barn' + (model.barns.some(b => b.scn.some(s => s.key === 'proposed')) ? ', and the proposed remodel where one has been sized.' : '.')) + '</p>';
     if (!model.barns.length) return h + '<p class="rpt-empty">No barns recorded yet.</p></div>';
     h += '<div class="rglance">';
@@ -5354,7 +5326,7 @@ const VENT = (function () {
       b.scn.forEach(s => { const note = s.status.cls === 'ok' ? 'Every goal is met and every part is big enough.' : s.status.cls === 'na' ? 'Add the fans to check this barn.' : escH(s.shorts.slice(0, 2).join(', ')) + (s.shorts.length > 2 ? ' and ' + (s.shorts.length - 2) + ' more' : '');
         h += '<div class="rg-side"><span class="rst ' + s.status.cls + '"><i class="gl">' + glyph(s.status.cls) + '</i> ' + escH(b.scn.length > 1 ? s.label + ': ' : '') + escH(s.status.label) + '</span><span class="rg-short">' + note + '</span></div>'; });
       h += '</div></div>'; });
-    return h + '</div><h2 class="rh2">How to read the charts</h2>' + legendSvg() + '</div>';
+    return h + '</div><h2 class="rh2">How to read the charts</h2>' + legendSvg() + (extra || '') + '</div>';
   }
   function barnSummaryHtml(b) {
     const two = b.scn.length > 1, pn = m => m === POS ? 'positive pressure' : 'negative pressure', modes = b.scn.map(s => s.mode).filter((m, i, a) => a.indexOf(m) === i);
@@ -5367,12 +5339,6 @@ const VENT = (function () {
     if (b.goals.length) h += '<h3 class="rh3">Airflow compared with the goals</h3>' + (two ? '<p class="rleg"><span class="lg-c"></span> As installed &nbsp;&nbsp; <span class="lg-d"></span> Proposed</p>' : '') + goalChartSvg(b.goals);
     if (b.parts.length) h += '<h3 class="rh3">Are the parts big enough?</h3>' + partChartSvg(b.parts, two);
     return h + '</div>';
-  }
-  function guideHtml(model) {
-    const modes = []; model.barns.forEach(b => b.scn.forEach(s => { if (modes.indexOf(s.mode) < 0) modes.push(s.mode); })); if (!modes.length) return '';
-    let h = '<div class="rguide"><h2 class="rh2">How the air moves</h2><div class="rair-row">';
-    modes.forEach(m => { h += '<figure class="rfig">' + airflowSvg(m) + '<figcaption>' + (m === POS ? '<b>Positive pressure.</b> Supply fans push filtered air in through the filter bank and cool cells, and the ceiling inlets spread it through the barn. The barn is held slightly above the outside pressure, so the air leaves through the sidewall shutters and dampers. There are no exhaust fans.' : '<b>Negative pressure.</b> Exhaust fans pull air out of the barn. Fresh air comes in through the soffit, inlets and filters, and through the cool cells in hot weather.') + '</figcaption></figure>'; });
-    return h + '</div></div>';
   }
   function renderReport(container, config, meta, done) {
     resolveAllPhotos(config || {}, map => { renderReportSync(container, config, meta, map); if (typeof done === 'function') done(); });
@@ -5516,14 +5482,19 @@ const VENT = (function () {
       if (reps) h += '<div class="prepair">&#9888; ' + reps + ' equipment item' + (reps > 1 ? 's' : '') + ' flagged for repair or replacement.</div>';
       h += assumptionsTable(ex, pr, inst, type) + resultsTable(ex, pr, isFar, rooms) + checksTable(ex, pr) + equipTable(inst) + (meta.hideExisting ? '' : condTable(inst)) + '</div>';
     }));
-    const techHtml = h; let tail = '';
+    const techHtml = h; let tail = '', signHtml = '';
     if (!any && !style) tail += '<p class="rpt-empty">No barns recorded yet — add barns' + (st ? ' to the site' : ' in the audit') + ', then generate the report.</p>';
-    else if (any) tail += '<div class="rpt-sign"><div class="sig-col"><div class="sig-line"></div><div class="sig-cap">' + byLabel + (meta.preparedBy ? ': ' + esc(meta.preparedBy) : '') + '</div></div>' +
+    else if (any) signHtml = '<div class="rpt-sign"><div class="sig-col"><div class="sig-line"></div><div class="sig-cap">' + byLabel + (meta.preparedBy ? ': ' + esc(meta.preparedBy) : '') + '</div></div>' +
       '<div class="sig-col"><div class="sig-line"></div><div class="sig-cap">Reviewed by — Licensed Professional Engineer</div></div>' +
       '<div class="sig-seal">P.E.<br>Seal</div></div>';
-    tail += (style === 'summary' ? '<p class="rpt-foot"><b>This ' + (designSite ? 'design' : 'audit') + ' is for preliminary assessment only</b> — it must be reviewed and sealed by a licensed professional engineer before use in design or construction. Fans and inlets are rated from the manufacturers’ published tables where one is loaded.</p>' : '<p class="rpt-foot">Calculations replicate the ventilation worksheets. Fans and inlets use the manufacturer’s published tables where one is loaded; a fan or inlet without one is marked as a workbook curve (or, if its curve is unusable, as needing a rated CFM), and one used beyond its table is marked as beyond published data. Filters and cool cells use the workbook’s polynomial curves. Farrowing is computed on a per-room basis.' + ((pressureOf(config, 'existing') === POS || pressureOf(config, 'proposed') === POS) ? ' Positive-pressure barns follow JEG’s Positive template (2-25-26 SD Sow Positive): supply fans work against the filter bank, cool cells, head loss, max vent shutter and the pressure held in the barn; inlets must carry the full max-vent flow.' : '') + ' <b>This ' + (designSite ? 'design' : 'audit') + ' is for preliminary assessment only</b> — it must be reviewed and sealed by a licensed professional engineer before use in design or construction.</p>');
+    const footShort = '<p class="rpt-foot"><b>This ' + (designSite ? 'design' : 'audit') + ' is for preliminary assessment only</b> — it must be reviewed and sealed by a licensed professional engineer before use in design or construction. Fans and inlets are rated from the manufacturers’ published tables where one is loaded.</p>';
+    const footHtml = (style === 'summary' ? footShort : '<p class="rpt-foot">Calculations replicate the ventilation worksheets. Fans and inlets use the manufacturer’s published tables where one is loaded; a fan or inlet without one is marked as a workbook curve (or, if its curve is unusable, as needing a rated CFM), and one used beyond its table is marked as beyond published data. Filters and cool cells use the workbook’s polynomial curves. Farrowing is computed on a per-room basis.' + ((pressureOf(config, 'existing') === POS || pressureOf(config, 'proposed') === POS) ? ' Positive-pressure barns follow JEG’s Positive template (2-25-26 SD Sow Positive): supply fans work against the filter bank, cool cells, head loss, max vent shutter and the pressure held in the barn; inlets must carry the full max-vent flow.' : '') + ' <b>This ' + (designSite ? 'design' : 'audit') + ' is for preliminary assessment only</b> — it must be reviewed and sealed by a licensed professional engineer before use in design or construction.</p>');
     let body = techHtml;
-    if (style) { const model = summaryModel(config, meta); body = summaryHtml(model, meta) + model.barns.map(barnSummaryHtml).join('') + guideHtml(model) + (style === 'full' && any ? '<div class="rtech"><h1 class="rh1">Technical details</h1><p class="rlead">The numbers, assumptions and equipment behind the charts.</p>' + techHtml + '</div>' : ''); }
+    if (style) {
+      const model = summaryModel(config, meta), early = model.barns.length > 0 && model.barns.length <= 6;   // up to six barns: the sign-off sits on the summary page, so no page has only a signature on it
+      body = summaryHtml(model, meta, early ? signHtml + footShort : '') + model.barns.map(barnSummaryHtml).join('') + (style === 'full' && any ? '<div class="rtech"><h1 class="rh1">Technical details</h1><p class="rlead">The numbers, assumptions and equipment behind the charts.</p>' + techHtml + '</div>' : '');
+      tail = early ? (style === 'full' ? footHtml : '') : signHtml + footHtml;
+    } else tail += signHtml + footHtml;
     container.innerHTML = headHtml + body + tail;
   }
 
