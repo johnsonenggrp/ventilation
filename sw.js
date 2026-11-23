@@ -1,7 +1,7 @@
 /* JEG Ventilation Sizing - offline service worker.
  * Network-first for the page (freshest when online, cached copy with no signal); cache-first for the icon.
  * Bump CACHE to force a refresh of cached assets. */
-const CACHE = "ventsizing-v2";
+const CACHE = "ventsizing-v3";
 self.addEventListener("install", e => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(self.clients.claim()));
 self.addEventListener("fetch", e => {
