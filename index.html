@@ -4579,6 +4579,24 @@ const VENT = (function () {
     return out;
   };
   const reqsOf = inst => { const r = inst && inst.reqs, out = {}; let n = 0; if (r) Object.keys(r).forEach(k => { if (okTgt(r[k]) && +r[k] > 0) { out[k] = +r[k]; n++; } }); return n ? out : null; };
+  // The least fan CFM that still meets the goals the barn has, for the max stage and for the min stage. Every goal is turned into a window of CFM (a typed fan-capacity goal, CFM per pig x pigs, air exchange,
+  // air speed x cross-section); a goal that is cleared bounds nothing, a blank end is open. When the windows overlap the floor is the low end of the overlap (the biggest low end). When they do not (a wide barn
+  // cannot meet the air speed goal together with the per-pig one: see TARGETS.md) the first goal in that order that has a low end wins, the way Recommend sizing falls back to the per-pig goal. The air speed goal
+  // is not used in a farrowing room (the sizer leaves it out too). Used by the fan "To add" line, so that it works before the proposed table has any fans.
+  const fanFloors = (inst, limits, isFar) => {
+    const b = inst.building || {}, L = num(b.length), W = num(b.width), H = num(b.height), inv = num(b.inventory), vol = L * W * H;
+    const end = x => (x != null && x !== '' && isFinite(+x) && +x > 0) ? +x : null;
+    const win = (r, f) => { if (!Array.isArray(r)) return null; const lo = end(r[0]), hi = end(r[1]); return lo == null && hi == null ? null : [lo == null ? 0 : lo * f, hi == null ? Infinity : hi * f]; };   // the goal r, scaled to CFM by f
+    const inv2 = (r, k) => { if (!Array.isArray(r) || !(k > 0)) return null; const lo = end(r[0]), hi = end(r[1]); return lo == null && hi == null ? null : [hi == null ? 0 : k / hi, lo == null ? Infinity : k / lo]; };   // a time goal (shorter time = more CFM): k / time
+    const pick = ws => { const w = ws.filter(Boolean); if (!w.length) return 0; const lo = Math.max.apply(null, w.map(x => x[0])), hi = Math.min.apply(null, w.map(x => x[1])); return lo <= hi ? lo : (w.filter(x => x[0] > 0)[0] || [0])[0]; };
+    const cross = b.crossVent || 'No', center = b.centerTunnel || 'No', csa = (cross === 'Yes' && center === 'No') ? L * H : (center === 'Yes' && cross === 'No') ? W * H * 2 : W * H;
+    return {
+      max: pick([win(limits.fanMax, 1), inv > 0 ? win(limits.flowMax, inv) : null, vol > 0 ? inv2(limits.airExchangeSec, vol * 60) : null, !isFar && csa > 0 ? win(limits.airSpeed, csa) : null]),
+      min: pick([win(limits.fanMin, 1), inv > 0 ? win(limits.flowMin, inv) : null, vol > 0 ? inv2(limits.airExchMin, vol) : null])
+    };
+  };
+  // a fan this size (diameter, inches) or bigger is a tunnel (max-ventilation) fan: the 48–55" fans on the end wall. The 18" and 24" ones are stir fans or the min stage, never the fans the "To add" line offers.
+  const FAN_TUNNEL_DIAM = 36;
   // a goal in words: 25–35, at least 300 (≥ 300), at most 800 (≤ 800)
   const limText = l => !l ? 'no limit' : (l[0] != null && l[1] != null) ? l[0] + '–' + l[1] : l[0] != null ? '≥ ' + l[0] : '≤ ' + l[1];
   // "Positive pressure in barn, in" (Input Sheet B8 of the Positive workbooks, 0.07): the pressure the barn is held above outside; it adds to what the supply fans work against.
@@ -4925,22 +4943,41 @@ const VENT = (function () {
       padReplace.forEach(o => options.push(o));
       out[k] = Object.assign({ have, need, covered, list: sizes.some(u => u.listed) || !!replace, options }, sides ? { end: sides } : {});
     });
-    // FANS of a NEGATIVE-pressure farrowing room (2026-11-23; a positive room has no fan line): how many more of the fans already in the room the proposed total takes, one choice per existing fan model. The existing fans are rated at the PROPOSED
-    // tunnel pressure (that is where they will run) and at the fan factor; need = the proposed table's own max CFM (there is no sufficiency check for fans). It is for ONE room, like the fan rows
-    // themselves. Max (tunnel) CFM only: the min stage is not counted. No mix of two models: which fans stay is a choice. Other barn types have no fan line yet.
-    if (inst.type === 'far' && prop.mode === NEG && prop.totals.fanMax > 0) {
-      const spF = prop.pressure.fan.used, ff = q.b.fanFactor, seenF = {}, fsz = []; let haveF = 0;
+    // FANS of a NEGATIVE-pressure barn (farrowing room 2026-11-23; the other barn types the same day; a positive barn has no fan line yet): how many more of the fans already in the barn the proposed side takes.
+    // The existing fans are rated at the PROPOSED fan pressures (that is where they will run) and at the fan factor. need = the proposed table's own CFM, or what the goals call for (the low end of each,
+    // fanFloors) when that is more: the line works before the proposed table has any fans. A farrowing room is ONE room, like its fan rows.
+    // The choices are one per existing fan model plus the TWO BEST combinations of two models (the least over-build, then the fewest fans). In a barn other than a farrowing room only the tunnel-size models
+    // (FAN_TUNNEL_DIAM and up: the 48-55" fans on the end wall) are offered, because the 18" and 24" ones are stir fans or the min stage (when the barn has no fan that big, every model is offered); the totals still
+    // count every fan in the table, as the table's own capacity does. A second line, for the MIN stage, is made only when the existing fans fall short of the proposed min CFM: it counts in the models that
+    // already run at min stage (minQty) at the proposed min pressure. A farrowing room has no min line (its min fans can run at part speed).
+    if (prop.mode === NEG) {
+      const isF = inst.type === 'far', spT = prop.pressure.fan.used, spM = prop.pressure.fanMin.used, ff = q.b.fanFactor, byKey = {}, models = []; let haveT = 0, haveM = 0;
       (inst.rows.existing.fan || []).forEach(r => {
-        if (!(r && r.model && num(r.qty) > 0)) return;
-        const c = cat.fan.coeff(r.mfg, r.series, r.model), rated = num(r.ratedCfm), t = c ? (rated > 0 ? { cfm: rated } : fanCfm(c, spF)) : null;   // a rated CFM typed on the row replaces the catalog curve, as in the table
+        if (!(r && r.model && (num(r.qty) > 0 || num(r.minQty) > 0))) return;
+        const c = cat.fan.coeff(r.mfg, r.series, r.model), rated = num(r.ratedCfm);   // a rated CFM typed on the row replaces the catalog curve, as in the table
+        const t = c ? (rated > 0 ? { cfm: rated } : fanCfm(c, spT)) : null, m = c ? (rated > 0 ? { cfm: rated } : fanCfm(c, spM)) : null;
         if (!t || !(t.cfm > 0)) return;
-        const key = [r.mfg, r.series, r.model].join('|'); haveF += t.cfm * ff * num(r.qty);
-        if (!seenF[key]) { seenF[key] = true; fsz.push({ unit: t.cfm * ff, name: who(r) }); }
+        const key = [r.mfg, r.series, r.model].join('|'), d = /^\s*(\d{2})/.exec(r.model), mCfm = m && m.cfm > 0 ? m.cfm * ff : 0;
+        haveT += t.cfm * ff * num(r.qty); haveM += mCfm * num(r.minQty);
+        if (!byKey[key]) { byKey[key] = { unit: t.cfm * ff, unitMin: mCfm, name: who(r), diam: d ? +d[1] : 0, minRow: false }; models.push(byKey[key]); }
+        if (num(r.minQty) > 0) byKey[key].minRow = true;
       });
-      if (fsz.length && haveF > 0) {
-        const needF = prop.totals.fanMax, gapF = needF - haveF, coveredF = gapF <= needF * 1e-9;
-        out.fan = { have: haveF, need: needF, covered: coveredF, list: false, room: true, options: coveredF ? [] : fsz.map(u => { const n = Math.ceil(gapF / u.unit - 1e-9); return { n, unit: u.unit, text: pl(n, 'fan') + ' (' + u.name + ')' }; }) };
+      // one choice per model, then the two best combinations of two models (for each PAIR the mix that covers the gap with the least over-build, at least one of each: the shutters' and pads' rule)
+      const fanOptions = (units, gap, tail) => {
+        const text = parts => parts.map(p => pl(p.n, 'fan') + ' (' + p.u.name + ')').join(' plus ') + tail, options = [], mixes = [];
+        units.forEach(u => { const n = Math.ceil(gap / u.unit - 1e-9); options.push({ n, unit: u.unit, text: text([{ n, u }]) }); });
+        for (let i = 0; i < units.length; i++) for (let j = i + 1; j < units.length; j++) { const m = bestMix([units[i], units[j]], gap); if (m) mixes.push({ mix: true, n: m.n, total: m.total, parts: m.parts.map(p => ({ n: p.n, unit: p.u.unit })), text: text(m.parts) }); }
+        mixes.sort((a, b) => Math.abs(a.total - b.total) > gap * 1e-9 ? a.total - b.total : a.n - b.n);
+        return options.concat(mixes.slice(0, 2));
+      };
+      const fl = fanFloors(inst, limits, isF);
+      const needT = Math.max(prop.totals.fanMax, fl.max);
+      if (models.length && haveT > 0 && needT > 0) {
+        const big = models.filter(u => u.diam >= FAN_TUNNEL_DIAM), choices = (isF || !big.length ? models : big).filter(u => u.unit > 0), gapT = needT - haveT, coveredT = gapT <= needT * 1e-9;
+        out.fan = { have: haveT, need: needT, covered: coveredT, list: true, room: isF, goal: fl.max > prop.totals.fanMax * (1 + 1e-9), options: coveredT ? [] : fanOptions(choices, gapT, '') };   // list: one row per choice, the way the pads, shutters and filter bank are drawn
       }
+      const needM = Math.max(prop.totals.fanMin, fl.min), minModels = models.filter(u => u.minRow && u.unitMin > 0), gapM = needM - haveM;
+      if (!isF && minModels.length && needM > 0 && gapM > needM * 1e-9) out.fanMin = { have: haveM, need: needM, covered: false, list: true, stage: 'min', goal: fl.min > prop.totals.fanMin * (1 + 1e-9), options: fanOptions(minModels.map(u => ({ unit: u.unitMin, name: u.name })), gapM, ' at min stage') };
     }
     return out;
   }
@@ -6271,8 +6308,12 @@ const VENT = (function () {
       else if (ck === 'coolCell') { foot.appendChild(totalSlot(sec, 'coolCellArea', 'Total Area', 'SF')); foot.appendChild(totalSlot(sec, 'coolCell', 'Total Capacity', 'CFM')); }
       else foot.appendChild(totalSlot(sec, cfg.group, 'Total Capacity', 'CFM'));
       block.appendChild(foot);
-      // (fans have a "To add" line in a negative-pressure farrowing room only, for now: the box is built for any farrowing room and stays hidden when toAdd gives no fan line)
-      if ((ck !== 'fan' || isFar) && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'), body = $('div', 'ca-body'); add.hidden = true; add.appendChild(body); RES[sec + '.add.' + ck] = add; RES[sec + '.addbody.' + ck] = body; block.appendChild(add); if (ck === 'coolCell') { add.appendChild(buildPadHeightBox(inst, sec)); add.appendChild(buildPadEndBox(inst, sec)); } }   // "To add": filled in by paintAdd
+      // (every category gets its "To add" box; it stays hidden when toAdd gives no line for it, e.g. fans in a positive barn. Fans get a second box, 'fanMin', for the min stage)
+      if (sec !== 'existing' && scenarios.indexOf('existing') >= 0) {
+        const mkAdd = key => { const add = $('div', 'cat-add'), body = $('div', 'ca-body'); add.hidden = true; add.appendChild(body); RES[sec + '.add.' + key] = add; RES[sec + '.addbody.' + key] = body; block.appendChild(add); return add; };   // "To add": filled in by paintAdd
+        const add = mkAdd(ck); if (ck === 'coolCell') { add.appendChild(buildPadHeightBox(inst, sec)); add.appendChild(buildPadEndBox(inst, sec)); }
+        if (ck === 'fan') mkAdd('fanMin');
+      }
       return block;
     }
     function totalSlot(sec, key, label, unit) { const d = $('div', 'cat-total'); d.appendChild($('span', 'ct-label', label)); const v = $('span', 'ct-val'); const line = $('div', 'ct-line'); line.appendChild(v); line.appendChild($('span', 'ct-unit', unit)); d.appendChild(line); RES[sec + '.tot.' + key] = v; return d; }
@@ -6334,7 +6375,8 @@ const VENT = (function () {
       RES[sec + '.addH'] = i; RES[sec + '.addW'] = j; return w;
     }
     function paintAdd(sec, ta, inst) {
-      CAT_ORDER.forEach(ck => {
+      const boxes = []; CAT_ORDER.forEach(ck => { boxes.push(ck); if (ck === 'fan') boxes.push('fanMin'); });   // the fans' min stage has a box of its own, under the fans' max stage
+      boxes.forEach(ck => {
         const el = RES[sec + '.add.' + ck], body = RES[sec + '.addbody.' + ck]; if (!el || !body) return;
         const r = ta[ck]; body.innerHTML = ''; el.hidden = !r; if (!r) return;
         if (r.covered) { body.appendChild($('span', 'ca-label', 'To add')); body.appendChild($('b', 'ca-opt', 'nothing, the existing ' + CATS[ck].title.toLowerCase() + (/s$/i.test(CATS[ck].title) ? ' already cover it' : ' already covers it'))); }
@@ -6346,7 +6388,8 @@ const VENT = (function () {
           body.appendChild(list);
         }
         else { body.appendChild($('span', 'ca-label', 'To add')); r.options.forEach((o, i) => { if (i) body.appendChild($('span', 'ca-or', 'or')); body.appendChild($('b', 'ca-opt', o.text)); }); }
-        body.appendChild($('span', 'ca-sub', r.end ? 'the sides have ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM they need (the ' + +r.end.len.toFixed(2) + ' ft × ' + +r.end.ht.toFixed(2) + ' ft end pad stays: ' + fmt(r.end.cfm) + ' CFM); counts are per side' : r.have > 0 ? 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM' + (r.room ? ' per room' : '') + ' the proposed side needs' : 'none recorded in the barn: the proposed side needs ' + fmt(r.need) + ' CFM, counted in the sizes of the existing shutters'));
+        const asked = r.goal ? 'the goals call for' : 'the proposed side needs';   // fans: the need is the goals' low end when the proposed table gives less
+        body.appendChild($('span', 'ca-sub', r.end ? 'the sides have ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM they need (the ' + +r.end.len.toFixed(2) + ' ft × ' + +r.end.ht.toFixed(2) + ' ft end pad stays: ' + fmt(r.end.cfm) + ' CFM); counts are per side' : r.stage === 'min' ? 'at min stage the existing fans give ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM ' + asked : r.have > 0 ? 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM' + (r.room ? ' per room' : '') + ' ' + asked : 'none recorded in the barn: the proposed side needs ' + fmt(r.need) + ' CFM, counted in the sizes of the existing shutters'));
         if (ck === 'coolCell') {
           const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; }
           const wb = RES[sec + '.addW']; if (wb) { const ls = ((inst.rows.existing || {}).coolCell || []).map(r => r && num(r.lenFt)).filter(x => x > 0).filter((x, i, a) => a.indexOf(x) === i); wb.placeholder = ls.length === 1 ? String(+ls[0].toFixed(2)) : ''; }   // the one length that is used when blank
