@@ -4925,6 +4925,23 @@ const VENT = (function () {
       padReplace.forEach(o => options.push(o));
       out[k] = Object.assign({ have, need, covered, list: sizes.some(u => u.listed) || !!replace, options }, sides ? { end: sides } : {});
     });
+    // FANS of a NEGATIVE-pressure farrowing room (2026-11-23; a positive room has no fan line): how many more of the fans already in the room the proposed total takes, one choice per existing fan model. The existing fans are rated at the PROPOSED
+    // tunnel pressure (that is where they will run) and at the fan factor; need = the proposed table's own max CFM (there is no sufficiency check for fans). It is for ONE room, like the fan rows
+    // themselves. Max (tunnel) CFM only: the min stage is not counted. No mix of two models: which fans stay is a choice. Other barn types have no fan line yet.
+    if (inst.type === 'far' && prop.mode === NEG && prop.totals.fanMax > 0) {
+      const spF = prop.pressure.fan.used, ff = q.b.fanFactor, seenF = {}, fsz = []; let haveF = 0;
+      (inst.rows.existing.fan || []).forEach(r => {
+        if (!(r && r.model && num(r.qty) > 0)) return;
+        const c = cat.fan.coeff(r.mfg, r.series, r.model), rated = num(r.ratedCfm), t = c ? (rated > 0 ? { cfm: rated } : fanCfm(c, spF)) : null;   // a rated CFM typed on the row replaces the catalog curve, as in the table
+        if (!t || !(t.cfm > 0)) return;
+        const key = [r.mfg, r.series, r.model].join('|'); haveF += t.cfm * ff * num(r.qty);
+        if (!seenF[key]) { seenF[key] = true; fsz.push({ unit: t.cfm * ff, name: who(r) }); }
+      });
+      if (fsz.length && haveF > 0) {
+        const needF = prop.totals.fanMax, gapF = needF - haveF, coveredF = gapF <= needF * 1e-9;
+        out.fan = { have: haveF, need: needF, covered: coveredF, list: false, room: true, options: coveredF ? [] : fsz.map(u => { const n = Math.ceil(gapF / u.unit - 1e-9); return { n, unit: u.unit, text: pl(n, 'fan') + ' (' + u.name + ')' }; }) };
+      }
+    }
     return out;
   }
 
@@ -6254,7 +6271,8 @@ const VENT = (function () {
       else if (ck === 'coolCell') { foot.appendChild(totalSlot(sec, 'coolCellArea', 'Total Area', 'SF')); foot.appendChild(totalSlot(sec, 'coolCell', 'Total Capacity', 'CFM')); }
       else foot.appendChild(totalSlot(sec, cfg.group, 'Total Capacity', 'CFM'));
       block.appendChild(foot);
-      if (ck !== 'fan' && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'), body = $('div', 'ca-body'); add.hidden = true; add.appendChild(body); RES[sec + '.add.' + ck] = add; RES[sec + '.addbody.' + ck] = body; block.appendChild(add); if (ck === 'coolCell') { add.appendChild(buildPadHeightBox(inst, sec)); add.appendChild(buildPadEndBox(inst, sec)); } }   // "To add": filled in by paintAdd
+      // (fans have a "To add" line in a negative-pressure farrowing room only, for now: the box is built for any farrowing room and stays hidden when toAdd gives no fan line)
+      if ((ck !== 'fan' || isFar) && sec !== 'existing' && scenarios.indexOf('existing') >= 0) { const add = $('div', 'cat-add'), body = $('div', 'ca-body'); add.hidden = true; add.appendChild(body); RES[sec + '.add.' + ck] = add; RES[sec + '.addbody.' + ck] = body; block.appendChild(add); if (ck === 'coolCell') { add.appendChild(buildPadHeightBox(inst, sec)); add.appendChild(buildPadEndBox(inst, sec)); } }   // "To add": filled in by paintAdd
       return block;
     }
     function totalSlot(sec, key, label, unit) { const d = $('div', 'cat-total'); d.appendChild($('span', 'ct-label', label)); const v = $('span', 'ct-val'); const line = $('div', 'ct-line'); line.appendChild(v); line.appendChild($('span', 'ct-unit', unit)); d.appendChild(line); RES[sec + '.tot.' + key] = v; return d; }
@@ -6319,7 +6337,7 @@ const VENT = (function () {
       CAT_ORDER.forEach(ck => {
         const el = RES[sec + '.add.' + ck], body = RES[sec + '.addbody.' + ck]; if (!el || !body) return;
         const r = ta[ck]; body.innerHTML = ''; el.hidden = !r; if (!r) return;
-        if (r.covered) { body.appendChild($('span', 'ca-label', 'To add')); body.appendChild($('b', 'ca-opt', 'nothing, the existing ' + CATS[ck].title.toLowerCase() + ' already covers it')); }
+        if (r.covered) { body.appendChild($('span', 'ca-label', 'To add')); body.appendChild($('b', 'ca-opt', 'nothing, the existing ' + CATS[ck].title.toLowerCase() + (/s$/i.test(CATS[ck].title) ? ' already cover it' : ' already covers it'))); }
         else if (r.list) {   // a list: rows of [left column | text]. "To add" leads the first row, then "or"; a heading (the pad model, the filter size and model) is a row of its own, and a second heading follows an "or"
           const items = []; let prev = null;
           r.options.forEach(o => { const h = o.head || null; if (h && h !== prev) items.push({ text: h, head: true }); prev = h; items.push({ text: o.text, underHead: items.length > 0 && items[items.length - 1].head }); });
@@ -6328,7 +6346,7 @@ const VENT = (function () {
           body.appendChild(list);
         }
         else { body.appendChild($('span', 'ca-label', 'To add')); r.options.forEach((o, i) => { if (i) body.appendChild($('span', 'ca-or', 'or')); body.appendChild($('b', 'ca-opt', o.text)); }); }
-        body.appendChild($('span', 'ca-sub', r.end ? 'the sides have ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM they need (the ' + +r.end.len.toFixed(2) + ' ft × ' + +r.end.ht.toFixed(2) + ' ft end pad stays: ' + fmt(r.end.cfm) + ' CFM); counts are per side' : r.have > 0 ? 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs' : 'none recorded in the barn: the proposed side needs ' + fmt(r.need) + ' CFM, counted in the sizes of the existing shutters'));
+        body.appendChild($('span', 'ca-sub', r.end ? 'the sides have ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM they need (the ' + +r.end.len.toFixed(2) + ' ft × ' + +r.end.ht.toFixed(2) + ' ft end pad stays: ' + fmt(r.end.cfm) + ' CFM); counts are per side' : r.have > 0 ? 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM' + (r.room ? ' per room' : '') + ' the proposed side needs' : 'none recorded in the barn: the proposed side needs ' + fmt(r.need) + ' CFM, counted in the sizes of the existing shutters'));
         if (ck === 'coolCell') {
           const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; }
           const wb = RES[sec + '.addW']; if (wb) { const ls = ((inst.rows.existing || {}).coolCell || []).map(r => r && num(r.lenFt)).filter(x => x > 0).filter((x, i, a) => a.indexOf(x) === i); wb.placeholder = ls.length === 1 ? String(+ls[0].toFixed(2)) : ''; }   // the one length that is used when blank
