@@ -515,7 +515,7 @@ table.pcond td.lcol{white-space:normal}
   .rg-row{page-break-inside:avoid}
 }
 @media print{
-  .nav,.vent-app,.calc-foot,.proj-details,.signin-page,.ws,.app-sub,.appbar{display:none !important}
+  .nav,.vent-app,.calc-foot,.proj-details,.signin-page,.ws,.app-sub,.appbar,.mgr-intro,.sync-banner{display:none !important}
   html,body,.shell{background:#fff !important}
   #printArea{display:block;max-width:none;padding:0}
   thead{display:table-header-group}
@@ -767,7 +767,7 @@ table.pcond td.lcol{white-space:normal}
 .tg-row .fld-err{grid-column:1 / -1}
 .tg-row .fld-err:empty,.tg-row .tg-hint:empty{display:none}
 .tg-reset{display:block;margin-top:14px}
-@media(max-width:560px){.tg-row{grid-template-columns:1fr 1fr auto}.tg-row .tg-l{grid-column:1 / -1}}
+@media(max-width:560px){.tg-row{grid-template-columns:minmax(0,1fr) auto minmax(0,1fr)}.tg-row .tg-l{grid-column:1 / -1}.tg-row input{min-width:0;width:100%;box-sizing:border-box}}   /* lower box, "to", upper box: the boxes must be allowed to shrink or the row runs off a phone screen */
 
 </style>
 </head>
@@ -4876,7 +4876,12 @@ const VENT = (function () {
       const c = prop.checks[k]; if (!(c && prop.totals[k] > 0)) return;      // the proposed side has none of this
       const seen = {}, sizes = [];
       (inst.rows.existing[k] || []).forEach((r, i) => { const rr = r && ex.rows[k][i], us = rr ? UNIT[k](r, rr) : null; (us || []).forEach(u => { if (!seen[u.key]) { seen[u.key] = u; sizes.push(u); } else if (u.haveN) seen[u.key].haveN += u.haveN; }); });
-      let have = ex.totals[k]; if (!sizes.length || !(have > 0)) return;
+      let fellBack = false;
+      if (k === 'damper' && !sizes.length) {   // no existing dampers recorded: a min vent damper is a shutter-sized opening (Recommend sizing uses the shutter's size too), so count in the sizes of the existing shutters, rated like a damper at the damper's pressure
+        const dpVel = 4005 * Math.sqrt(q.sp.damper != null ? q.sp.damper : q.sp.shutter) * (okOC(q.b.openingCoeff) ? +q.b.openingCoeff : OC_DEFAULT);
+        (inst.rows.existing.shutter || []).forEach(r => { if (!(r && num(r.number) > 0 && num(r.lenFt) > 0 && num(r.widthIn) > 0)) return; (UNIT.damper({ number: 1, lenFt: r.lenFt, widthIn: r.widthIn }, { total: (num(r.widthIn) / 12) * num(r.lenFt) * dpVel }) || []).forEach(u => { if (!seen[u.key]) { seen[u.key] = u; sizes.push(u); fellBack = true; } }); });
+      }
+      let have = ex.totals[k] || 0; if (!sizes.length || (!(have > 0) && !fellBack)) return;
       let need = Math.max(prop.totals[k], c.ref > 0 ? c.ref : 0), sides = null;
       if (k === 'coolCell' && E) {   // the end pad stays: its share of the need comes off the need, and its row (the one of that length and height) comes off what the barn has
         const eRows = inst.rows[scenario].coolCell || [], ei = eRows.findIndex((r, i) => r && num(r.lenFt) > 0 && num(r.htFt) > 0 && prop.rows.coolCell[i] && prop.rows.coolCell[i].vel > 0);
@@ -5173,7 +5178,7 @@ const VENT = (function () {
       const unv = res.flags.unverified.filter(x => /^Fan /.test(x)), beyond = res.flags.beyond.filter(x => /^Fan /.test(x));
       if (unv.length) warn('Workbook curves (no published table loaded): ' + unv.map(x => x.replace(/^Fan /, '')).join(', ') + ' — ' + (unv.length > 1 ? 'their CFM comes' : 'its CFM comes') + ' from the workbook’s curve, not a published table. Confirm ' + (unv.length > 1 ? 'them' : 'it') + ' with the manufacturer (or enter a rated CFM on the row) before specifying.');
       if (beyond.length) warn('This design relies on fan numbers past the published data: ' + beyond.map(x => x.replace(/^Fan /, '')).join('; ') + '. Treat the CFM as an estimate.'); }
-    if (POSM) info('Positive pressure: supply fans push filtered air in through the filter bank and cool cells; it leaves through the sidewall max vent shutters and min vent dampers (no exhaust fans, no inlet filters, no soffit). Sizing basis (the SD Sow Positive workbook): inlets carry all of the max-vent flow; cool cells, filter bank and max vent shutters are sized ' + Math.round((FF - 1) * 100) + '% above it' + (isFar ? ' (the cool cells and filter bank serve the whole building: ' + R + ' rooms × ' + fmt(T.fanMax) + ' CFM = ' + fmt(T.fanMax * R) + ' CFM; the shutter is sized to the inlet flow)' : '; the min vent dampers ' + Math.round((FF - 1) * 100) + '% above the min-vent flow (' + damperNum + ' × ' + (damperRows[0] ? damperRows[0].lenFt + ' ft × ' + damperRows[0].widthIn + ' in.' : '') + ')') + '.');
+    if (POSM) info('Positive pressure: supply fans push filtered air in through the filter bank and cool cells; it leaves through the sidewall max vent shutters' + (isFar ? '' : ' and min vent dampers') + ' (no exhaust fans, no inlet filters, no soffit' + (isFar ? ', no min vent damper in a farrowing room' : '') + '). Sizing basis (the SD Sow Positive workbook): inlets carry all of the max-vent flow; cool cells, filter bank and max vent shutters are sized ' + Math.round((FF - 1) * 100) + '% above it' + (isFar ? ' (the cool cells and filter bank serve the whole building: ' + R + ' rooms × ' + fmt(T.fanMax) + ' CFM = ' + fmt(T.fanMax * R) + ' CFM; the shutter is sized to the inlet flow)' : '; the min vent dampers ' + Math.round((FF - 1) * 100) + '% above the min-vent flow (' + damperNum + ' × ' + (damperRows[0] ? damperRows[0].lenFt + ' ft × ' + damperRows[0].widthIn + ' in.' : '') + ')') + '.');
     else info('Sizing basis (JEG’s current workbook): inlet filters, cool cells, filters, shutters and soffit are each sized ' + Math.round((FF - 1) * 100) + '% above the flow they serve (the Filter Oversizing setting)' + (isFar ? '; the cool cells, filter bank and soffit serve the whole building: ' + R + ' rooms × ' + fmt(T.fanMax) + ' CFM = ' + fmt(T.fanMax * R) + ' CFM' : '') + '.');
     info('Equipment: ' + (mine.length || pickRow('inlet', 'model') || pickRow('coolCell', 'name') ? 'what you picked on the Proposed side is kept; the rest is' : 'everything is') + ' JEG’s standard — Munters Vortex (' + (isFar ? 'rooms may also use PigTek Hero HO' : '24″ min-stage, 36–55″ tunnel') + '), DoubleL RD2400 ceiling inlets, Munters Aerotech CT pads, VariCel VXL MERV-15 filters' + (POSM ? '' : ', bird-screen soffit') + '. Installed models are not carried over; pick a model on the Proposed side and re-run to use something else.');
     const inPer = Math.ceil(inletQty / inletRowsN);
@@ -6323,7 +6328,7 @@ const VENT = (function () {
           body.appendChild(list);
         }
         else { body.appendChild($('span', 'ca-label', 'To add')); r.options.forEach((o, i) => { if (i) body.appendChild($('span', 'ca-or', 'or')); body.appendChild($('b', 'ca-opt', o.text)); }); }
-        body.appendChild($('span', 'ca-sub', r.end ? 'the sides have ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM they need (the ' + +r.end.len.toFixed(2) + ' ft × ' + +r.end.ht.toFixed(2) + ' ft end pad stays: ' + fmt(r.end.cfm) + ' CFM); counts are per side' : 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs'));
+        body.appendChild($('span', 'ca-sub', r.end ? 'the sides have ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM they need (the ' + +r.end.len.toFixed(2) + ' ft × ' + +r.end.ht.toFixed(2) + ' ft end pad stays: ' + fmt(r.end.cfm) + ' CFM); counts are per side' : r.have > 0 ? 'existing gives ' + fmt(r.have) + ' of the ' + fmt(r.need) + ' CFM the proposed side needs' : 'none recorded in the barn: the proposed side needs ' + fmt(r.need) + ' CFM, counted in the sizes of the existing shutters'));
         if (ck === 'coolCell') {
           const hb = RES[sec + '.addH']; if (hb) { const d = proposedPadHeight(inst, sec); hb.placeholder = d != null ? String(+d.toFixed(2)) : ''; }
           const wb = RES[sec + '.addW']; if (wb) { const ls = ((inst.rows.existing || {}).coolCell || []).map(r => r && num(r.lenFt)).filter(x => x > 0).filter((x, i, a) => a.indexOf(x) === i); wb.placeholder = ls.length === 1 ? String(+ls[0].toFixed(2)) : ''; }   // the one length that is used when blank
@@ -7407,7 +7412,7 @@ const SHELL = (function () {
     const progChip = el('div', 'audit-prog');
     const updateProg = () => { const p = siteProgress(site); progChip.className = 'audit-prog' + (p.total && p.complete === p.total ? ' done' : (p.total ? ' warn' : '')); progChip.innerHTML = p.total ? ('<b>' + p.complete + '</b> of <b>' + p.total + '</b> barns ' + (proposedSite ? 'designed' : 'recorded')) : 'No barns yet'; };
     details.appendChild(progChip);
-    const syncEl = el('div', 'sync-line'), banner = el('div', 'sync-banner');
+    const syncEl = el('div', 'sync-line'), banner = el('div', 'sync-banner'); banner.style.display = 'none';   // hidden until paintSync has something to say (a build without team mode never calls it, and an empty banner is a bare orange strip)
     const paintSync = () => {
       if (!teamSite) return;
       const sy = syncInfo(site, teamEntry(site.id)); syncEl.innerHTML = syncChipHtml(sy); const sub = syncEl.querySelector('.sync-sub'); if (sub && sy.sub) sub.textContent = sy.sub;
